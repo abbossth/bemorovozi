@@ -50,7 +50,7 @@ if (!hospitalId) {
 const staff = await Staff.findOneAndUpdate(
   { firebaseUid: firebaseUser.uid },
   { hospitalId, firebaseUid: firebaseUser.uid, name, role: "admin" },
-  { upsert: true, new: true }
+  { upsert: true, returnDocument: "after" }
 );
 
 console.log(`Linked ${email} (${firebaseUser.uid}) -> Staff ${staff._id} @ hospital ${hospitalId}`);

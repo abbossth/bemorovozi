@@ -19,7 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const department = await Department.findOneAndUpdate(
     { _id: id, hospitalId: staff.hospitalId },
     { name: parsed.data.name },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!department) return NextResponse.json({ error: "Topilmadi" }, { status: 404 });
 

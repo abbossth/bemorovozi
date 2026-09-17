@@ -52,7 +52,7 @@ function LogoMarkPdf() {
 export function QrCardDocument({ departmentName, qrDataUrl }: { departmentName: string; qrDataUrl: string }) {
   return (
     <Document>
-      <Page size="A6" style={styles.page}>
+      <Page size="A5" style={styles.page}>
         <View style={styles.card}>
           <LogoMarkPdf />
           <Text style={styles.wordmark}>BemorOvozi</Text>
