@@ -1,13 +1,15 @@
 import type { AiProvider } from "./types";
 import { geminiProvider } from "./gemini";
 import { anthropicProvider } from "./anthropic";
+import { openaiProvider } from "./openai";
 
 export * from "./types";
 
 function resolveProvider(): AiProvider {
-  const provider = process.env.AI_PROVIDER ?? "gemini";
+  const provider = process.env.AI_PROVIDER ?? "openai";
   if (provider === "anthropic") return anthropicProvider;
-  return geminiProvider;
+  if (provider === "gemini") return geminiProvider;
+  return openaiProvider;
 }
 
 export function normalizeIssueTag(tag: string) {
