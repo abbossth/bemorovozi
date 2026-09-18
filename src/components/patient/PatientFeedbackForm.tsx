@@ -5,6 +5,13 @@ import { LogoMark } from "@/components/Logo";
 
 type VoiceTurn = { role: "ai" | "patient"; text: string };
 
+// A near-silent WAV, used only to "unlock" audio playback on iOS Safari/Chrome
+// (both WebKit) — they refuse programmatic .play() unless it's tied to a real
+// user gesture. Playing this on the same tap that starts/stops recording
+// grants that gesture to the <audio> element; the actual AI reply is played
+// on that same element later, once STT+AI+TTS round trips have finished.
+const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
 type Props = {
   hospitalId: string;
   departmentId: string;
@@ -30,6 +37,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
   const [voiceDone, setVoiceDone] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [recording, setRecording] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   async function submitTranscript(transcript: string, channel: "text" | "voice") {
     setSubmitting(true);
@@ -65,6 +73,12 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
   }
 
   async function handleMicTap() {
+    // Must run synchronously inside the tap handler — this is what grants the
+    // element permission to play() later on iOS, after the async STT/AI/TTS chain.
+    if (!audioRef.current) audioRef.current = new Audio();
+    audioRef.current.src = SILENT_WAV;
+    audioRef.current.play().catch(() => {});
+
     if (voiceDone) {
       const transcript = voiceTurns.map((t) => `${t.role === "ai" ? "Yordamchi" : "Bemor"}: ${t.text}`).join("\n");
       await submitTranscript(transcript, "voice");
@@ -115,9 +129,10 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
           })
             .then((r) => (r.ok ? r.arrayBuffer() : null))
             .then((buf) => {
-              if (!buf) return;
+              if (!buf || !audioRef.current) return;
               const url = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
-              new Audio(url).play().catch(() => {});
+              audioRef.current.src = url;
+              audioRef.current.play().catch(() => {});
             })
             .catch(() => {});
         } catch (e) {
