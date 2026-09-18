@@ -149,14 +149,22 @@ export function SettingsPage() {
               <div className="flex flex-col items-center gap-3.5 rounded-[20px] border border-gray-200 bg-white px-7 py-8 text-center">
                 <LogoMark size={40} />
                 <span className="font-heading text-base font-extrabold text-ink">BemorOvozi</span>
-                <Image
-                  src={selected.qrDataUrl}
-                  alt={`${selected.name} uchun QR kod`}
-                  width={168}
-                  height={168}
-                  unoptimized
-                  className="mt-1 mb-1 rounded-lg"
-                />
+                <a
+                  href={selected.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Bemor formasini yangi tabda ochish"
+                  className="mt-1 mb-1 block transition hover:opacity-80"
+                >
+                  <Image
+                    src={selected.qrDataUrl}
+                    alt={`${selected.name} uchun QR kod — bosib ko'rish`}
+                    width={168}
+                    height={168}
+                    unoptimized
+                    className="rounded-lg"
+                  />
+                </a>
                 <span className="mt-1.5 font-heading text-[17px] font-extrabold text-ink">{selected.name}</span>
                 <span className="text-sm font-bold text-teal">Takliflar va shikoyatlar uchun</span>
                 <span className="text-xs text-gray-400">Telefon kamerasi bilan skanerlang</span>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Navbar } from "@/components/marketing/Navbar";
+import { HeroVideo } from "@/components/marketing/HeroVideo";
 import { Faq } from "@/components/marketing/Faq";
 import { LeadForm } from "@/components/marketing/LeadForm";
 import { LogoMark } from "@/components/Logo";
@@ -154,21 +155,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="relative">
-              <div className="flex aspect-video w-full items-center justify-center rounded-[20px] bg-navy shadow-[0_30px_60px_rgba(13,17,23,0.25)]">
-                <div className="flex h-[84px] w-[84px] items-center justify-center rounded-full bg-white">
-                  <svg viewBox="0 0 24 24" width={26} height={26} fill="#E5534B">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="absolute -bottom-5 left-6 flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 shadow-[0_12px_28px_rgba(15,23,17,0.14)]">
-                <svg viewBox="0 0 24 24" width={18} height={18} fill="#E5534B">
-                  <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" />
-                </svg>
-                <span className="text-[13px] font-bold text-ink">15 soniyalik namoyish</span>
-              </div>
-            </div>
+            <HeroVideo />
           </div>
         </section>
 
