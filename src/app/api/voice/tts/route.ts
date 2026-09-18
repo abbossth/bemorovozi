@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { textToSpeech } from "@/lib/voicelab";
+import { textToSpeech } from "@/lib/voice";
 
 const bodySchema = z.object({ text: z.string().min(1) });
 

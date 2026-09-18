@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { speechToText } from "@/lib/voicelab";
+import { speechToText } from "@/lib/voice";
 
 // Audio arrives as multipart form data and lives only in this request's memory —
 // it is never written to disk or the database, and is dropped as soon as this
