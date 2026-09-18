@@ -22,9 +22,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ text });
   } catch (error) {
     mark("route.voice.stt.failed", { ms: Date.now() - routeStart });
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Ovozni tanib bo'lmadi" },
-      { status: 502 }
-    );
+    // Log the real cause (provider name, HTTP status, billing state, etc.) for
+    // us to debug — but never forward that internal detail to an anonymous
+    // patient's screen.
+    console.error("[api/voice/stt] failed:", error);
+    return NextResponse.json({ error: "Ovozni tanib bo'lmadi. Iltimos, qayta urinib ko'ring." }, { status: 502 });
   }
 }

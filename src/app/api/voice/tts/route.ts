@@ -20,9 +20,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     mark("route.voice.tts.failed", { ms: Date.now() - routeStart });
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Ovoz yaratib bo'lmadi" },
-      { status: 502 }
-    );
+    console.error("[api/voice/tts] failed:", error);
+    return NextResponse.json({ error: "Ovoz yaratib bo'lmadi." }, { status: 502 });
   }
 }
