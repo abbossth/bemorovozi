@@ -13,6 +13,16 @@ const NAV = [
     ),
   },
   {
+    href: "/dashboard/leads",
+    label: "Lidlar",
+    icon: (
+      <>
+        <path d="M3 5h18v3l-9 6-9-6V5z" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M3 8v11h18V8" strokeLinecap="round" strokeLinejoin="round" />
+      </>
+    ),
+  },
+  {
     href: "/dashboard/settings",
     label: "Sozlamalar",
     icon: (

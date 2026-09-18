@@ -69,3 +69,53 @@ export async function notifyStaffForFeedback(feedback: NotifiableFeedback, depar
     })
   );
 }
+
+const LEAD_SOURCE_LABEL: Record<string, string> = {
+  demo: "Demo so'rash",
+  narxlar_b2b: "Narxlar (B2B)",
+  narxlar_b2g: "Narxlar (B2G)",
+  pilot: "Pilot dastur",
+};
+
+type NotifiableLead = {
+  source: string;
+  organizationName: string;
+  contactName: string;
+  phone: string;
+  email?: string;
+  message?: string;
+  plan?: string;
+};
+
+/**
+ * Notifies every linked staff member about a new marketing lead (demo request,
+ * pricing page contact form). Leads aren't scoped to a hospital — the current
+ * deployment is single-tenant, so every connected staff account is, in
+ * practice, the platform operator who should see sales inquiries.
+ */
+export async function notifyStaffForLead(lead: NotifiableLead) {
+  if (!process.env.TELEGRAM_STAFF_BOT_TOKEN) return;
+
+  const staffList = await Staff.find({ telegramChatId: { $exists: true, $ne: null } });
+  if (staffList.length === 0) return;
+
+  const bot = getStaffBot();
+  const text =
+    `📩 <b>Yangi lid</b> — ${LEAD_SOURCE_LABEL[lead.source] ?? lead.source}\n\n` +
+    `🏥 ${lead.organizationName}\n` +
+    `👤 ${lead.contactName}\n` +
+    `📞 ${lead.phone}\n` +
+    (lead.email ? `✉️ ${lead.email}\n` : "") +
+    (lead.plan ? `📦 Tarif: ${lead.plan}\n` : "") +
+    (lead.message ? `\n${lead.message}` : "");
+
+  await Promise.all(
+    staffList.map(async (staff) => {
+      try {
+        await bot.api.sendMessage(staff.telegramChatId!, text, { parse_mode: "HTML" });
+      } catch (error) {
+        console.error(`[notifyStaff] Failed to notify staff ${staff._id} about lead:`, error);
+      }
+    })
+  );
+}

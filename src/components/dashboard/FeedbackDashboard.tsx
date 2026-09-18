@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge, NEXT_STATUS, NEXT_STATUS_LABEL, type Status } from "@/components/StatusBadge";
 import { StatCard } from "@/components/StatCard";
+import { NewFeedbackToasts, type Toast } from "@/components/dashboard/NewFeedbackToasts";
+import { playSeverityAlert } from "@/lib/notificationSound";
 import type { Severity } from "@/lib/ai/types";
 
 type FeedbackItem = {
@@ -56,6 +58,41 @@ export function FeedbackDashboard() {
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const today = new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long" });
 
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const knownIdsRef = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!data) return;
+    const currentIds = new Set(items.map((i) => i.id));
+
+    if (knownIdsRef.current) {
+      const newItems = items.filter((i) => !knownIdsRef.current!.has(i.id));
+      if (newItems.length > 0) {
+        const newToasts = newItems.map((i) => ({
+          key: `${i.id}-${Date.now()}`,
+          id: i.id,
+          severity: i.severity,
+          dept: i.dept,
+          summary: i.summary,
+        }));
+        setToasts((prev) => [...newToasts, ...prev]);
+        newToasts.forEach((t) => {
+          setTimeout(() => dismissToast(t.key), 8000);
+        });
+        // Loudest/most urgent severity among the new arrivals gets to play.
+        const bySeverityRank: Record<Severity, number> = { yuqori: 2, orta: 1, past: 0 };
+        const loudest = newItems.reduce((a, b) => (bySeverityRank[b.severity] > bySeverityRank[a.severity] ? b : a));
+        playSeverityAlert(loudest.severity);
+      }
+    }
+    // First load just establishes the baseline — no toasts/sound for pre-existing items.
+    knownIdsRef.current = currentIds;
+  }, [data, items]);
+
+  function dismissToast(key: string) {
+    setToasts((prev) => prev.filter((t) => t.key !== key));
+  }
+
   async function advanceStatus(item: FeedbackItem) {
     const next = NEXT_STATUS[item.status];
     if (!next) return;
@@ -74,6 +111,7 @@ export function FeedbackDashboard() {
 
   return (
     <div className="flex h-screen flex-col gap-7 overflow-hidden px-12 py-10">
+      <NewFeedbackToasts toasts={toasts} onDismiss={dismissToast} onSelect={setSelectedId} />
       <div>
         <h1 className="font-heading text-[28px] font-extrabold text-ink">Xabarlar</h1>
         <p className="mt-1 text-sm text-gray-500" suppressHydrationWarning>

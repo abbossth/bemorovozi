@@ -17,6 +17,7 @@
   --font-sans: var(--font-work-sans), system-ui, sans-serif;
 
   --animate-mic-pulse: micPulse 2s infinite;
+  --animate-toast-in: toastIn 0.25s ease-out;
 }
 
 @keyframes micPulse {
@@ -28,6 +29,17 @@
   }
   100% {
     box-shadow: 0 0 0 0 rgba(15, 110, 92, 0);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
