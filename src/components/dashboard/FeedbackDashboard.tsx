@@ -112,7 +112,7 @@ export function FeedbackDashboard() {
       </div>
 
       <div className="flex min-h-0 flex-grow gap-6">
-        <div className="flex flex-grow flex-col gap-3 overflow-y-auto pr-1">
+        <div className="flex min-h-0 flex-grow flex-col gap-3 overflow-y-auto pr-1">
           {filtered.length === 0 && (
             <p className="mt-10 text-center text-sm text-gray-400">Hozircha xabarlar yo&apos;q.</p>
           )}
@@ -150,7 +150,7 @@ export function FeedbackDashboard() {
           })}
         </div>
 
-        <div className="flex w-[360px] flex-shrink-0 flex-col rounded-[14px] border border-gray-200 bg-white p-6">
+        <div className="flex min-h-0 w-[360px] flex-shrink-0 flex-col overflow-y-auto rounded-[14px] border border-gray-200 bg-white p-6">
           {selected ? (
             <div className="flex flex-grow flex-col gap-4">
               <SeverityBadge severity={selected.severity} suffix="jiddiylik" />

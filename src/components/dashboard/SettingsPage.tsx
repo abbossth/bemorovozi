@@ -68,7 +68,7 @@ export function SettingsPage() {
       {error && <p className="rounded-lg bg-coral-tint px-3 py-2 text-[13px] text-coral">{error}</p>}
 
       <div className="flex min-h-0 flex-grow gap-6">
-        <div className="flex flex-grow flex-col gap-5">
+        <div className="flex min-h-0 flex-grow flex-col gap-5">
           <div className="flex items-end gap-3 rounded-[14px] border border-gray-200 bg-white p-5">
             <div className="flex flex-grow flex-col gap-1.5">
               <label htmlFor="newDept" className="text-[13px] font-semibold text-ink">
@@ -94,7 +94,7 @@ export function SettingsPage() {
             </button>
           </div>
 
-          <div className="flex flex-col gap-2.5 overflow-y-auto">
+          <div className="flex min-h-0 flex-grow flex-col gap-2.5 overflow-y-auto">
             {isLoading && <p className="text-sm text-gray-400">Yuklanmoqda...</p>}
             {!isLoading && items.length === 0 && (
               <p className="text-sm text-gray-400">Hali bo&apos;lim qo&apos;shilmagan.</p>
@@ -140,7 +140,7 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="flex w-[360px] flex-shrink-0 flex-col gap-4">
+        <div className="flex min-h-0 w-[360px] flex-shrink-0 flex-col gap-4 overflow-y-auto">
           <h3 className="font-heading text-base font-bold text-ink">Bosma QR-karta</h3>
 
           {selected ? (
