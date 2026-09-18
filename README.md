@@ -13,9 +13,11 @@ yo'naltiruvchi platforma. Umummilliy AI Xakaton (Xorazm, 2026) uchun.
 - **AI**: swappable provider (`src/lib/ai`) — hozircha **Gemini**
   (`gemini-3.6-flash`) ulangan; `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`
   qo'yilsa, kod o'zgarishsiz Claude'ga o'tadi
-- **VoiceLab** (voicelab.uz, Aisha.group oilasidan) — ovozli suhbat rejimi uchun
-  STT/TTS (`src/lib/voicelab.ts`), `VOICELAB_API_KEY` bilan ulangan va ishlaydi
+- **Ovoz**: swappable STT/TTS (`src/lib/voice`) — **VoiceLab** asosiy, ishlamasa
+  **NeuronAI**'ga avtomatik o'tadi (`src/lib/voice/index.ts`)
 - **QR + PDF**: `qrcode` + `@react-pdf/renderer`
+- **Telegram**: ikkita bot (grammY) — xodim bildirishnoma boti va anonim bemor
+  boti, ikkalasi ham `src/lib/createFeedback.ts`dagi bitta pipeline'ni ishlatadi
 
 ## Ishga tushirish
 
@@ -59,8 +61,14 @@ npm run build   # production build
 - `src/app/dashboard` — xodimlar paneli (Firebase Auth talab qilinadi)
 - `src/app/(marketing)` (`/`, `/narxlar`) — bosh sahifa va narxlar
 - `src/lib/ai` — provayderdan mustaqil AI qatlami (Gemini/Anthropic)
-- `src/lib/voicelab.ts` — VoiceLab STT/TTS wrapper (STT is async — polls until "completed")
-- `src/models` — Mongoose sxemalari (Hospital, Department, Staff, Feedback, Lead)
+- `src/lib/voice` — STT/TTS qatlami, VoiceLab → NeuronAI avtomatik fallback bilan
+- `src/lib/createFeedback.ts` — yagona feedback-yaratish pipeline (web forma +
+  ikkala Telegram bot shu bittasini chaqiradi)
+- `src/lib/telegram` — ikkala botning grammY logikasi (`staffBot.ts`,
+  `patientBot.ts`, `notifyStaff.ts`)
+- `src/app/api/telegram` — webhook route'lar, staff link-token API, digest cron
+- `src/models` — Mongoose sxemalari (Hospital, Department, Staff, Feedback, Lead,
+  TelegramLinkToken, TelegramNotification)
 - `scripts/` — seed va staff-yaratish skriptlari
 
 ## Loyihaviy qarorlar (nima uchun)
