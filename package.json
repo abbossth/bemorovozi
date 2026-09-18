@@ -43,5 +43,9 @@
   },
   "overrides": {
     "jose": "^5"
-  }
+  },
+  "browserslist": [
+    "defaults",
+    "not dead"
+  ]
 }

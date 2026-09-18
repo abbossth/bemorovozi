@@ -111,7 +111,7 @@ export function LeadsDashboard() {
 
       <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
         <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1">
-          {filtered.length === 0 && <p className="mt-10 text-center text-sm text-gray-400">Hozircha lidlar yo&apos;q.</p>}
+          {filtered.length === 0 && <p className="mt-10 text-center text-sm text-gray-500">Hozircha lidlar yo&apos;q.</p>}
           {filtered.map((lead) => {
             const active = lead.id === selectedId;
             const statusMeta = STATUS_META[lead.status];
@@ -127,7 +127,7 @@ export function LeadsDashboard() {
                   <span className="rounded-full bg-gray-100 px-2.5 py-[3px] text-xs font-semibold text-gray-500">
                     {SOURCE_LABEL[lead.source]}
                   </span>
-                  <span className="text-[13px] text-gray-400">{formatTime(lead.createdAt)}</span>
+                  <span className="text-[13px] text-gray-500">{formatTime(lead.createdAt)}</span>
                 </div>
                 <p className="font-heading text-[15px] font-bold text-ink">{lead.organizationName}</p>
                 <p className="text-sm text-gray-500">
@@ -204,7 +204,7 @@ export function LeadsDashboard() {
             </div>
           ) : (
             <div className="flex flex-grow items-center justify-center text-center">
-              <p className="max-w-[220px] text-sm text-gray-400">Batafsil ko&apos;rish uchun ro&apos;yxatdan lidni tanlang.</p>
+              <p className="max-w-[220px] text-sm text-gray-500">Batafsil ko&apos;rish uchun ro&apos;yxatdan lidni tanlang.</p>
             </div>
           )}
         </div>

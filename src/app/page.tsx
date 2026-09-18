@@ -186,7 +186,7 @@ export default function HomePage() {
               {STEPS.map((step) => (
                 <div key={step.n} className="flex flex-col gap-4 rounded-2xl border border-gray-200 p-8">
                   <div className="flex h-14 w-14 items-center justify-center rounded-[14px] bg-teal-tint">{step.icon}</div>
-                  <span className="text-[13px] font-semibold text-gray-400">{step.n}</span>
+                  <span className="text-[13px] font-semibold text-gray-500">{step.n}</span>
                   <h3 className="font-heading text-xl font-bold text-ink">{step.title}</h3>
                   <p className="text-[15px] leading-relaxed text-gray-500">{step.body}</p>
                 </div>
@@ -202,7 +202,7 @@ export default function HomePage() {
               <h2 className="font-heading text-3xl font-extrabold text-ink sm:text-[34px]">
                 Nega shifoxonalar BemorOvozini tanlaydi
               </h2>
-              <p className="text-lg text-gray-500">
+              <p className="text-lg text-gray-600">
                 Bitta tizimda — bemordan tortib ma&apos;muriyatgacha kerak bo&apos;lgan hamma narsa
               </p>
             </div>
@@ -308,7 +308,7 @@ export default function HomePage() {
               <h2 className="font-heading text-3xl font-extrabold text-ink sm:text-[34px]">
                 B2B va B2G uchun moslashuvchan narxlar
               </h2>
-              <p className="text-lg text-gray-500">
+              <p className="text-lg text-gray-600">
                 Shifoxona kattaligiga mos oylik obuna. Davlat boshqarmalari uchun individual shartnoma.
               </p>
             </div>
@@ -350,7 +350,7 @@ export default function HomePage() {
             <h2 className="font-heading text-[32px] font-extrabold text-white">
               Shifoxonangiz uchun pilot dasturga qo&apos;shiling
             </h2>
-            <p className="text-base text-gray-400">Xorazm viloyatida birinchi bosqich pilot mijozlarini qidiramiz.</p>
+            <p className="text-base text-gray-300">Xorazm viloyatida birinchi bosqich pilot mijozlarini qidiramiz.</p>
           </div>
           <div id="demo" className="mx-auto mt-10 max-w-xl rounded-2xl bg-white p-8 text-left">
             <LeadForm source="demo" submitLabel="Bog'lanish" />
@@ -371,7 +371,7 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="flex flex-col gap-2.5">
-                <span className="text-[13px] font-bold text-gray-400">Mahsulot</span>
+                <span className="text-[13px] font-bold text-gray-500">Mahsulot</span>
                 <Link href="/#qanday-ishlaydi" className="text-sm text-gray-600">
                   Qanday ishlaydi
                 </Link>
@@ -383,7 +383,7 @@ export default function HomePage() {
                 </Link>
               </div>
               <div className="flex flex-col gap-2.5">
-                <span className="text-[13px] font-bold text-gray-400">Kompaniya</span>
+                <span className="text-[13px] font-bold text-gray-500">Kompaniya</span>
                 <Link href="/login" className="text-sm text-gray-600">
                   Kirish
                 </Link>
@@ -393,8 +393,8 @@ export default function HomePage() {
               </div>
             </div>
             <div className="flex items-center justify-between border-t border-gray-200 pt-6">
-              <span className="text-[13px] text-gray-400">© 2026 BemorOvozi</span>
-              <a href="mailto:hello@bemorovozi.uz" className="text-[13px] text-gray-400">
+              <span className="text-[13px] text-gray-500">© 2026 BemorOvozi</span>
+              <a href="mailto:hello@bemorovozi.uz" className="text-[13px] text-gray-500">
                 hello@bemorovozi.uz
               </a>
             </div>

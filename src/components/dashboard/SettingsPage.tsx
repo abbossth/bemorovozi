@@ -96,9 +96,9 @@ export function SettingsPage() {
           </div>
 
           <div className="flex max-h-[420px] flex-col gap-2.5 overflow-y-auto">
-            {isLoading && <p className="text-sm text-gray-400">Yuklanmoqda...</p>}
+            {isLoading && <p className="text-sm text-gray-500">Yuklanmoqda...</p>}
             {!isLoading && items.length === 0 && (
-              <p className="text-sm text-gray-400">Hali bo&apos;lim qo&apos;shilmagan.</p>
+              <p className="text-sm text-gray-500">Hali bo&apos;lim qo&apos;shilmagan.</p>
             )}
             {items.map((dept) => {
               const active = selected?.id === dept.id;
@@ -130,7 +130,7 @@ export function SettingsPage() {
                       type="button"
                       onClick={() => handleDelete(dept.id)}
                       disabled={busy}
-                      className="text-[13px] font-semibold text-gray-400 hover:text-coral disabled:opacity-50"
+                      className="text-[13px] font-semibold text-gray-500 hover:text-coral disabled:opacity-50"
                     >
                       O&apos;chirish
                     </button>
@@ -167,8 +167,8 @@ export function SettingsPage() {
                 </a>
                 <span className="mt-1.5 font-heading text-[17px] font-extrabold text-ink">{selected.name}</span>
                 <span className="text-sm font-bold text-teal">Takliflar va shikoyatlar uchun</span>
-                <span className="text-xs text-gray-400">Telefon kamerasi bilan skanerlang</span>
-                <span className="mt-2 text-[11px] text-gray-300">bemorovozi.uz</span>
+                <span className="text-xs text-gray-500">Telefon kamerasi bilan skanerlang</span>
+                <span className="mt-2 text-[11px] text-gray-500">bemorovozi.uz</span>
               </div>
               <a
                 href={`/api/departments/${selected.id}/pdf`}
@@ -178,7 +178,7 @@ export function SettingsPage() {
               </a>
             </>
           ) : (
-            <div className="flex flex-grow items-center justify-center rounded-[20px] border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
+            <div className="flex flex-grow items-center justify-center rounded-[20px] border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
               QR karta ko&apos;rish uchun bo&apos;lim tanlang yoki yangi bo&apos;lim qo&apos;shing.
             </div>
           )}

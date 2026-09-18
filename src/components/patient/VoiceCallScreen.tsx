@@ -404,7 +404,7 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
             {micError && callState !== "stuck" ? (
               <span className="max-w-[260px] text-xs leading-relaxed text-coral">{micError}</span>
             ) : (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-gray-500">
                 {callState === "listening"
                   ? "Tugatish uchun bosing yoki jim turing"
                   : callState === "speaking"

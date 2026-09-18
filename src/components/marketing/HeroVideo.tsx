@@ -19,6 +19,7 @@ export function HeroVideo() {
           src="/hero-demo.mp4"
           controls={playing}
           playsInline
+          preload="none"
           onEnded={() => setPlaying(false)}
           onPause={() => setPlaying(false)}
           className="h-full w-full object-cover"

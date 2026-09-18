@@ -131,7 +131,7 @@ export default function PricingPage() {
                       </span>
                     )}
                     <div>
-                      <h3 className="mb-1.5 font-heading text-[22px] font-extrabold text-ink">{tier.name}</h3>
+                      <h2 className="mb-1.5 font-heading text-[22px] font-extrabold text-ink">{tier.name}</h2>
                       <p className="text-sm" style={{ color: tier.recommended ? "#4B5563" : "#6B7280" }}>
                         {tier.subtitle}
                       </p>
@@ -211,7 +211,7 @@ export default function PricingPage() {
             <div className="mx-auto flex max-w-3xl justify-center">
               <div className="w-full rounded-3xl border-2 border-teal bg-teal-tint p-10 sm:p-12">
                 <span className="text-[13px] font-bold text-teal">Viloyat sog&apos;liqni saqlash boshqarmasi uchun</span>
-                <h3 className="mt-2 font-heading text-[28px] font-extrabold text-ink">B2G agregatsiya paketi</h3>
+                <h2 className="mt-2 font-heading text-[28px] font-extrabold text-ink">B2G agregatsiya paketi</h2>
                 <p className="mt-4 text-base leading-relaxed text-ink">
                   Hududdagi barcha ulangan shifoxonalarni bitta agregatsiya panelida ko&apos;ring — viloyat
                   bo&apos;yicha tendensiyalar, hisobotlar va monitoring standartlariga moslashtirilgan ma&apos;lumotlar.
@@ -268,7 +268,7 @@ export default function PricingPage() {
             <LogoMark size={24} />
             <span className="text-sm text-gray-500">© 2026 BemorOvozi</span>
           </span>
-          <Link href="mailto:hello@bemorovozi.uz" className="text-[13px] text-gray-400">
+          <Link href="mailto:hello@bemorovozi.uz" className="text-[13px] text-gray-500">
             hello@bemorovozi.uz
           </Link>
         </footer>

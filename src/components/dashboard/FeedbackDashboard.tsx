@@ -152,7 +152,7 @@ export function FeedbackDashboard() {
       <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
         <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1">
           {filtered.length === 0 && (
-            <p className="mt-10 text-center text-sm text-gray-400">Hozircha xabarlar yo&apos;q.</p>
+            <p className="mt-10 text-center text-sm text-gray-500">Hozircha xabarlar yo&apos;q.</p>
           )}
           {filtered.map((item) => {
             const active = item.id === selectedId;
@@ -176,7 +176,7 @@ export function FeedbackDashboard() {
                       </span>
                     )}
                   </div>
-                  <span className="text-[13px] text-gray-400">{formatTime(item.createdAt)}</span>
+                  <span className="text-[13px] text-gray-500">{formatTime(item.createdAt)}</span>
                 </div>
                 <p className="text-[15px] leading-relaxed text-ink">{item.summary}</p>
                 <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export function FeedbackDashboard() {
             </div>
           ) : (
             <div className="flex flex-grow items-center justify-center text-center">
-              <p className="max-w-[220px] text-sm text-gray-400">Batafsil ko&apos;rish uchun ro&apos;yxatdan xabarni tanlang.</p>
+              <p className="max-w-[220px] text-sm text-gray-500">Batafsil ko&apos;rish uchun ro&apos;yxatdan xabarni tanlang.</p>
             </div>
           )}
         </div>

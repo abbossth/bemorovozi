@@ -70,7 +70,7 @@ export function TelegramLinkCard() {
       {error && <p className="mt-3 rounded-lg bg-coral-tint px-3 py-2 text-[13px] text-coral">{error}</p>}
 
       {isLoading ? (
-        <p className="mt-4 text-sm text-gray-400">Yuklanmoqda...</p>
+        <p className="mt-4 text-sm text-gray-500">Yuklanmoqda...</p>
       ) : data?.connected ? (
         <div className="mt-4 flex flex-col gap-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-teal">
@@ -110,7 +110,7 @@ export function TelegramLinkCard() {
                 Kunlik xulosa
               </button>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-500">
               Yuqori jiddiylikdagi xabarlar bu sozlamadan qat&apos;i nazar har doim darhol yuboriladi.
             </p>
           </div>
@@ -119,7 +119,7 @@ export function TelegramLinkCard() {
             type="button"
             onClick={handleDisconnect}
             disabled={busy}
-            className="self-start text-[13px] font-semibold text-gray-400 hover:text-coral disabled:opacity-50"
+            className="self-start text-[13px] font-semibold text-gray-500 hover:text-coral disabled:opacity-50"
           >
             Ulanishni bekor qilish
           </button>
@@ -134,7 +134,7 @@ export function TelegramLinkCard() {
           >
             Telegram&apos;da ochish →
           </a>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             Havola 10 daqiqa amal qiladi. Botda /start bosgach hisobingiz avtomatik ulanadi.
           </p>
         </div>

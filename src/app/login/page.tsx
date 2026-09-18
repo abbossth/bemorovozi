@@ -131,7 +131,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-7 text-center text-[13px] text-gray-400">
+        <p className="mt-7 text-center text-[13px] text-gray-500">
           Hisobingiz yo&apos;qmi?{" "}
           <a href="mailto:hello@bemorovozi.uz" className="font-semibold text-teal">
             Ma&apos;muriyat bilan bog&apos;laning

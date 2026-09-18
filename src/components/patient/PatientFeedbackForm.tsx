@@ -221,7 +221,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
 
       <div className="mb-6 flex flex-col items-center gap-1.5 text-center">
         <h1 className="font-heading text-2xl font-extrabold tracking-tight text-ink">Fikringizni bildiring</h1>
-        <p className="text-[13px] text-gray-400">To&apos;liq anonim. Ism so&apos;ralmaydi.</p>
+        <p className="text-[13px] text-gray-500">To&apos;liq anonim. Ism so&apos;ralmaydi.</p>
         <span className="mt-2 rounded-full bg-teal-tint px-3 py-1.5 text-xs font-semibold text-teal">
           {departmentName}
           {floorLabel ? ` · ${floorLabel}` : ""}
@@ -238,7 +238,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Nima haqida xabar bermoqchisiz?"
             rows={5}
-            className="w-full resize-none bg-transparent px-1.5 pt-1 text-[15px] leading-relaxed text-ink outline-none placeholder:text-gray-400"
+            className="w-full resize-none bg-transparent px-1.5 pt-1 text-[15px] leading-relaxed text-ink outline-none placeholder:text-gray-500"
           />
           <div className="flex items-center justify-between px-1 pb-0.5">
             <div className="flex items-center gap-1.5">
@@ -285,7 +285,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
               onClick={handleTextSubmit}
               disabled={message.trim().length < 3 || submitting}
               aria-label="Yuborish"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-teal text-white transition disabled:bg-gray-200 disabled:text-gray-400"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-teal text-white transition disabled:bg-gray-200 disabled:text-gray-500"
             >
               {submitting ? (
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -298,13 +298,13 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
           </div>
         </div>
 
-        <p className="text-center text-xs leading-relaxed text-gray-400">
+        <p className="text-center text-xs leading-relaxed text-gray-500">
           Yozing, ovozdan matnga o&apos;girish uchun mikrofonga bosing, yoki AI bilan ovozli suhbatlashing — sun&apos;iy
           intellekt xabaringizni avtomatik tahlil qilib, tegishli bo&apos;limga yo&apos;naltiradi.
         </p>
       </div>
 
-      <p className="mt-6 text-center text-[11px] text-gray-300">
+      <p className="mt-6 text-center text-[11px] text-gray-500">
         Hech qanday shaxsiy ma&apos;lumot so&apos;ralmaydi yoki saqlanmaydi.
       </p>
     </div>
