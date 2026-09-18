@@ -116,7 +116,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
             .then((r) => (r.ok ? r.arrayBuffer() : null))
             .then((buf) => {
               if (!buf) return;
-              const url = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+              const url = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
               new Audio(url).play().catch(() => {});
             })
             .catch(() => {});

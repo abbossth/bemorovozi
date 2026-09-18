@@ -13,8 +13,8 @@ yo'naltiruvchi platforma. Umummilliy AI Xakaton (Xorazm, 2026) uchun.
 - **AI**: swappable provider (`src/lib/ai`) — hozircha **Gemini**
   (`gemini-3.6-flash`) ulangan; `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`
   qo'yilsa, kod o'zgarishsiz Claude'ga o'tadi
-- **Aisha AI** (aisha.group) — ovozli suhbat rejimi uchun STT/TTS (`src/lib/aisha.ts`,
-  `AISHA_API_KEY` kelgach ishga tushadi)
+- **VoiceLab** (voicelab.uz, Aisha.group oilasidan) — ovozli suhbat rejimi uchun
+  STT/TTS (`src/lib/voicelab.ts`), `VOICELAB_API_KEY` bilan ulangan va ishlaydi
 - **QR + PDF**: `qrcode` + `@react-pdf/renderer`
 
 ## Ishga tushirish
@@ -24,13 +24,10 @@ npm install
 npm run dev
 ```
 
-`.env.local` allaqachon mavjud kalitlar bilan to'ldirilgan (MongoDB, Gemini, Firebase
-web config). Hali kerak bo'lganlar:
+`.env.local` allaqachon barcha kalitlar bilan to'ldirilgan (MongoDB, Gemini, Firebase
+web config + Admin SDK, VoiceLab). Ixtiyoriy qolgan narsa:
 
-- `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` — Firebase
-  Console > Project Settings > Service accounts > Generate new private key
-- `AISHA_API_KEY` — aisha.group hisobingizdan
-- `ANTHROPIC_API_KEY` — agar Claude'ga o'tmoqchi bo'lsangiz
+- `ANTHROPIC_API_KEY` — agar Claude'ga o'tmoqchi bo'lsangiz (`AI_PROVIDER=anthropic`)
 
 To'liq ro'yxat uchun `.env.example`ga qarang.
 
@@ -62,7 +59,7 @@ npm run build   # production build
 - `src/app/dashboard` — xodimlar paneli (Firebase Auth talab qilinadi)
 - `src/app/(marketing)` (`/`, `/narxlar`) — bosh sahifa va narxlar
 - `src/lib/ai` — provayderdan mustaqil AI qatlami (Gemini/Anthropic)
-- `src/lib/aisha.ts` — Aisha AI STT/TTS wrapper
+- `src/lib/voicelab.ts` — VoiceLab STT/TTS wrapper (STT is async — polls until "completed")
 - `src/models` — Mongoose sxemalari (Hospital, Department, Staff, Feedback, Lead)
 - `scripts/` — seed va staff-yaratish skriptlari
 

@@ -12,19 +12,22 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  try {
-    const parsed = bodySchema.safeParse(await request.json());
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Noto'g'ri so'rov" }, { status: 400 });
-    }
+  const parsed = bodySchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Noto'g'ri so'rov" }, { status: 400 });
+  }
 
+  try {
     const result = await ai.voiceDialogueTurn(parsed.data.history);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[api/voice/turn] Unexpected error:", error);
-    return NextResponse.json(
-      { error: "Yordamchi hozircha javob bera olmadi. Birozdan so'ng qayta urinib ko'ring." },
-      { status: 502 }
-    );
+    console.error("[api/voice/turn] AI dialogue failed:", error);
+    // The patient already spoke and STT already succeeded — don't strand them on
+    // a dead end because the model had a transient hiccup. End the conversation
+    // gracefully so what they said so far still gets submitted.
+    return NextResponse.json({
+      reply: "Tushunarli, xabaringiz qabul qilindi. Fikr bildirganingiz uchun rahmat!",
+      done: true,
+    });
   }
 }
