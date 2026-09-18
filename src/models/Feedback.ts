@@ -19,6 +19,9 @@ const FeedbackSchema = new Schema(
     // feedback sharing a tag + department within a rolling window renders as one
     // cluster on the dashboard instead of a vector-similarity pipeline.
     issueTag: { type: String, required: true, index: true },
+    // Where the submission came from. Never carries any Telegram-identifying data —
+    // the patient bot deliberately never writes chat_id/user_id anywhere.
+    source: { type: String, enum: ["web", "telegram"], default: "web" },
   },
   { timestamps: true }
 );
