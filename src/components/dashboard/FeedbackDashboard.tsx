@@ -112,14 +112,14 @@ export function FeedbackDashboard() {
   return (
     <div className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:h-screen lg:gap-7 lg:overflow-hidden lg:px-12 lg:py-10">
       <NewFeedbackToasts toasts={toasts} onDismiss={dismissToast} onSelect={setSelectedId} />
-      <div>
+      <div className="flex-shrink-0">
         <h1 className="font-heading text-2xl font-extrabold text-ink lg:text-[28px]">Xabarlar</h1>
         <p className="mt-1 text-sm text-gray-500" suppressHydrationWarning>
           Bugun, {today}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
+      <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
         <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} />
         <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor="#E5534B" />
         <StatCard
@@ -128,7 +128,7 @@ export function FeedbackDashboard() {
         />
       </div>
 
-      <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div className="-mx-4 flex flex-shrink-0 gap-2.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {FILTERS.map((f) => {
           const active = filter === f.value;
           return (
