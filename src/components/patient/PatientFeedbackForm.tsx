@@ -37,6 +37,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
   const dictationSeqRef = useRef(0);
   const dictationInFlightRef = useRef(false);
   const dictationStoppingRef = useRef(false);
+  const dictationCooldownUntilRef = useRef(0);
 
   async function submitTranscript(transcript: string, channel: "text" | "voice") {
     setSubmitting(true);
@@ -74,7 +75,8 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
   // support), so "live" dictation is approximated by re-transcribing the whole
   // growing recording every couple of seconds and replacing the preview with
   // the fresher, more complete result — rather than a single request at the end.
-  const DICTATION_TICK_MS = 2200;
+  const DICTATION_TICK_MS = 3000;
+  const RATE_LIMIT_COOLDOWN_MS = 8000;
 
   async function transcribeBlob(blob: Blob): Promise<string> {
     const form = new FormData();
@@ -93,14 +95,21 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
 
   async function transcribeInterim() {
     if (dictationInFlightRef.current || dictationChunksRef.current.length === 0) return;
+    if (Date.now() < dictationCooldownUntilRef.current) return; // provider is rate-limiting us — stop hammering it
     dictationInFlightRef.current = true;
     const seq = ++dictationSeqRef.current;
     try {
       const blob = new Blob(dictationChunksRef.current, { type: "audio/webm" });
       const text = await transcribeBlob(blob);
       if (text) applyDictationText(text, seq);
-    } catch {
-      // interim failures stay silent — the final stop-transcription is authoritative
+    } catch (e) {
+      // Interim failures stay silent to the patient — the final stop-transcription
+      // is authoritative. But a 429 means every provider tried is rate-limited
+      // right now, so back off instead of firing the next tick straight into it
+      // (that would only extend the outage and burn quota needed for the final take).
+      if (e instanceof Error && /429|rate.?limit/i.test(e.message)) {
+        dictationCooldownUntilRef.current = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+      }
     } finally {
       dictationInFlightRef.current = false;
     }
@@ -120,6 +129,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
       dictationBaseRef.current = message.trim();
       dictationSeqRef.current = 0;
       dictationStoppingRef.current = false;
+      dictationCooldownUntilRef.current = 0;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) dictationChunksRef.current.push(e.data);
         if (!dictationStoppingRef.current) transcribeInterim();

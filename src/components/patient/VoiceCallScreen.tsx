@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { VoiceOrb, type OrbPhase, type VoiceOrbHandle } from "@/components/patient/VoiceOrb";
 
 type VoiceTurn = { role: "ai" | "patient"; text: string };
 
@@ -42,7 +43,7 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
   const [micError, setMicError] = useState<string | null>(null);
 
   const activeRef = useRef(true);
-  const orbRef = useRef<HTMLDivElement | null>(null);
+  const orbApiRef = useRef<VoiceOrbHandle | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -130,9 +131,7 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
   }
 
   function applyOrbScale(rms: number) {
-    if (!orbRef.current) return;
-    const scale = 1 + Math.min(rms * 3.2, 0.4);
-    orbRef.current.style.transform = `scale(${scale.toFixed(3)})`;
+    orbApiRef.current?.setLevel(rms);
   }
 
   function startListening() {
@@ -177,7 +176,7 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
     stoppingRef.current = true;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
-    if (orbRef.current) orbRef.current.style.transform = "scale(1)";
+    applyOrbScale(0);
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
@@ -222,12 +221,18 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
       }
     } catch (e) {
       consecutiveErrorsRef.current += 1;
-      setMicError(e instanceof Error ? e.message : "Xatolik yuz berdi");
+      const message = e instanceof Error ? e.message : "Xatolik yuz berdi";
+      setMicError(message);
       if (!activeRef.current) return;
       if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
         setCallState("stuck");
       } else {
-        startListening();
+        // A rate limit means retrying instantly would just extend the outage —
+        // give the provider a moment before the next turn tries again.
+        const backoffMs = /429|rate.?limit/i.test(message) ? 4000 : 400;
+        setTimeout(() => {
+          if (activeRef.current) startListening();
+        }, backoffMs);
       }
     }
   }
@@ -271,7 +276,7 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
             audioEl.removeEventListener("ended", onEnded);
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
             rafRef.current = null;
-            if (orbRef.current) orbRef.current.style.transform = "scale(1)";
+            applyOrbScale(0);
             resolve();
           };
           audioEl.addEventListener("ended", onEnded);
@@ -287,7 +292,7 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
     audioElRef.current?.pause();
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
-    if (orbRef.current) orbRef.current.style.transform = "scale(1)";
+    applyOrbScale(0);
     startListening();
   }
 
@@ -324,6 +329,17 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
     stuck: "Ovoz aniqlanmadi",
   };
 
+  const orbPhase: OrbPhase =
+    callState === "listening"
+      ? "listening"
+      : callState === "thinking"
+      ? "thinking"
+      : callState === "speaking"
+      ? "speaking"
+      : callState === "denied" || callState === "stuck"
+      ? "error"
+      : "idle";
+
   return (
     <div className="flex min-h-[520px] w-full flex-col px-6 py-6">
       <div className="mb-2 flex items-center justify-between">
@@ -350,61 +366,37 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
             onClick={handleOrbTap}
             disabled={callState === "thinking" || callState === "connecting" || callState === "denied" || callState === "stuck"}
             aria-label={callState === "listening" ? "Tugatish uchun bosing" : "Ovozli suhbat"}
-            className="relative flex h-[168px] w-[168px] items-center justify-center rounded-full disabled:cursor-default"
+            className="relative flex h-[190px] w-[190px] items-center justify-center rounded-full disabled:cursor-default"
           >
-            <div
-              className="absolute inset-[-14px] rounded-full opacity-40 blur-xl"
-              style={{
-                background: "radial-gradient(circle, rgba(15,110,92,0.55) 0%, rgba(15,110,92,0) 70%)",
-                animation: callState === "connecting" ? "orbBreathe 2.6s ease-in-out infinite" : undefined,
-              }}
-            />
-            <div
-              ref={orbRef}
-              className="relative h-full w-full rounded-full transition-transform duration-100 ease-out"
-              style={{
-                background: "radial-gradient(circle at 32% 28%, #34a88f 0%, #0f6e5c 55%, #0b5548 100%)",
-                animation:
-                  callState === "connecting" || callState === "denied" || callState === "stuck"
-                    ? "orbBreathe 2.6s ease-in-out infinite"
-                    : "orbFadeIn 0.35s ease-out",
-              }}
-            >
-              {callState === "thinking" && (
-                <div
-                  className="absolute inset-2 rounded-full border-[3px] border-white/25 border-t-white/80"
-                  style={{ animation: "orbThinkingSpin 1.1s linear infinite" }}
-                />
-              )}
-              {callState === "denied" && (
-                <svg
-                  viewBox="0 0 24 24"
-                  width={40}
-                  height={40}
-                  fill="none"
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                  className="absolute inset-0 m-auto"
-                >
-                  <path d="M9 2h6v11a3 3 0 0 1-6 0V2z" strokeLinecap="round" />
-                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16" strokeLinecap="round" />
-                </svg>
-              )}
-              {callState === "stuck" && (
-                <svg
-                  viewBox="0 0 24 24"
-                  width={36}
-                  height={36}
-                  fill="none"
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                  className="absolute inset-0 m-auto"
-                >
-                  <path d="M12 8v5M12 16.5h.01" strokeLinecap="round" />
-                  <circle cx="12" cy="12" r="9" />
-                </svg>
-              )}
-            </div>
+            <VoiceOrb ref={orbApiRef} phase={orbPhase} size={190} />
+            {callState === "denied" && (
+              <svg
+                viewBox="0 0 24 24"
+                width={40}
+                height={40}
+                fill="none"
+                stroke="#FFFFFF"
+                strokeWidth={2}
+                className="pointer-events-none absolute inset-0 m-auto drop-shadow-md"
+              >
+                <path d="M9 2h6v11a3 3 0 0 1-6 0V2z" strokeLinecap="round" />
+                <path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16" strokeLinecap="round" />
+              </svg>
+            )}
+            {callState === "stuck" && (
+              <svg
+                viewBox="0 0 24 24"
+                width={36}
+                height={36}
+                fill="none"
+                stroke="#FFFFFF"
+                strokeWidth={2}
+                className="pointer-events-none absolute inset-0 m-auto drop-shadow-md"
+              >
+                <path d="M12 8v5M12 16.5h.01" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            )}
           </button>
 
           <div className="flex flex-col items-center gap-1 text-center">
