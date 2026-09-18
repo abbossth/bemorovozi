@@ -82,13 +82,13 @@ export function LeadsDashboard() {
   }
 
   return (
-    <div className="flex h-screen flex-col gap-7 overflow-hidden px-12 py-10">
+    <div className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:h-screen lg:gap-7 lg:overflow-hidden lg:px-12 lg:py-10">
       <div>
-        <h1 className="font-heading text-[28px] font-extrabold text-ink">Lidlar</h1>
+        <h1 className="font-heading text-2xl font-extrabold text-ink lg:text-[28px]">Lidlar</h1>
         <p className="mt-1 text-sm text-gray-500">Demo so&apos;rash va narxlar sahifasidan kelgan so&apos;rovlar</p>
       </div>
 
-      <div className="flex gap-2.5">
+      <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {FILTERS.map((f) => {
           const active = filter === f.value;
           return (
@@ -96,7 +96,7 @@ export function LeadsDashboard() {
               key={f.value}
               type="button"
               onClick={() => setFilter(f.value)}
-              className="rounded-full border-[1.5px] px-[18px] py-2 text-sm font-semibold"
+              className="flex-shrink-0 rounded-full border-[1.5px] px-[18px] py-2 text-sm font-semibold"
               style={{
                 borderColor: active ? "#0F6E5C" : "#E4E7EB",
                 background: active ? "#EAF5F2" : "#FFFFFF",
@@ -109,8 +109,8 @@ export function LeadsDashboard() {
         })}
       </div>
 
-      <div className="flex min-h-0 flex-grow gap-6">
-        <div className="flex min-h-0 flex-grow flex-col gap-3 overflow-y-auto pr-1">
+      <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
+        <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1">
           {filtered.length === 0 && <p className="mt-10 text-center text-sm text-gray-400">Hozircha lidlar yo&apos;q.</p>}
           {filtered.map((lead) => {
             const active = lead.id === selectedId;
@@ -144,7 +144,7 @@ export function LeadsDashboard() {
           })}
         </div>
 
-        <div className="flex min-h-0 w-[360px] flex-shrink-0 flex-col overflow-y-auto rounded-[14px] border border-gray-200 bg-white p-6">
+        <div className="flex min-h-0 w-full flex-shrink-0 flex-col rounded-[14px] border border-gray-200 bg-white p-5 sm:p-6 lg:w-[360px] lg:overflow-y-auto">
           {selected ? (
             <div className="flex flex-grow flex-col gap-4">
               <span className="w-fit rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">
@@ -204,7 +204,7 @@ export function LeadsDashboard() {
             </div>
           ) : (
             <div className="flex flex-grow items-center justify-center text-center">
-              <p className="max-w-[220px] text-sm text-gray-400">Batafsil ko&apos;rish uchun chapdan lidni tanlang.</p>
+              <p className="max-w-[220px] text-sm text-gray-400">Batafsil ko&apos;rish uchun ro&apos;yxatdan lidni tanlang.</p>
             </div>
           )}
         </div>

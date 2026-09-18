@@ -60,9 +60,9 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col gap-7 px-12 py-10">
+    <div className="flex min-h-screen flex-col gap-5 px-4 py-6 sm:gap-7 sm:px-6 sm:py-8 lg:px-12 lg:py-10">
       <div>
-        <h1 className="font-heading text-[28px] font-extrabold text-ink">Sozlamalar</h1>
+        <h1 className="font-heading text-2xl font-extrabold text-ink lg:text-[28px]">Sozlamalar</h1>
         <p className="mt-1 text-sm text-gray-500">Bo&apos;lim va xonalarni boshqaring, ularning QR-kartalarini chop eting</p>
       </div>
 
@@ -70,7 +70,7 @@ export function SettingsPage() {
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="flex flex-grow flex-col gap-5">
-          <div className="flex items-end gap-3 rounded-[14px] border border-gray-200 bg-white p-5">
+          <div className="flex flex-col items-stretch gap-3 rounded-[14px] border border-gray-200 bg-white p-4 sm:flex-row sm:items-end sm:p-5">
             <div className="flex flex-grow flex-col gap-1.5">
               <label htmlFor="newDept" className="text-[13px] font-semibold text-ink">
                 Yangi bo&apos;lim yoki xona nomi
@@ -108,8 +108,8 @@ export function SettingsPage() {
                   className="flex w-full items-center justify-between rounded-xl border-[1.5px] px-[18px] py-4"
                   style={{ background: active ? "#EAF5F2" : "#FFFFFF", borderColor: active ? "#0F6E5C" : "#E4E7EB" }}
                 >
-                  <button type="button" onClick={() => setSelectedId(dept.id)} className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink">
+                  <button type="button" onClick={() => setSelectedId(dept.id)} className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-ink">
                       <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="#FFFFFF" strokeWidth={1.6}>
                         <rect x="3" y="3" width="7" height="7" rx="1" />
                         <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -120,9 +120,9 @@ export function SettingsPage() {
                         <rect x="18" y="14" width="3" height="3" />
                       </svg>
                     </div>
-                    <span className="text-[15px] font-semibold text-ink">{dept.name}</span>
+                    <span className="truncate text-[15px] font-semibold text-ink">{dept.name}</span>
                   </button>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-shrink-0 items-center gap-3 pl-3 sm:gap-4">
                     <button type="button" onClick={() => setSelectedId(dept.id)} className="text-[13px] font-semibold text-teal">
                       Ko&apos;rish →
                     </button>
