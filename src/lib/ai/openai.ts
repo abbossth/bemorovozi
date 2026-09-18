@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { withRetry } from "@/lib/retry";
 import { time } from "@/lib/timing";
+import { buildClassificationPrompt, buildVoiceTurnPrompt } from "./prompts";
 import type {
   AiProvider,
   ClassificationInput,
@@ -28,27 +29,7 @@ export const openaiProvider: AiProvider = {
       withRetry(() =>
         openai.chat.completions.create({
           model: MODEL,
-          messages: [
-            {
-              role: "user",
-              content: `Siz o'zbekiston shifoxonasidagi bemorlar fikr-mulohazasini tahlil qiluvchi yordamchisiz.
-Quyidagi bemor xabarini tahlil qiling va uni tasniflang.
-
-Bemor bo'limi tanlagan: "${input.departmentName}"
-Mavjud bo'limlar ro'yxati: ${input.availableDepartments.join(", ")}
-
-Bemor xabari:
-"""
-${input.transcript}
-"""
-
-Javobni faqat quyidagi JSON formatda qaytaring:
-- severity: "past" (kichik noqulaylik), "orta" (e'tibor talab qiladi), yoki "yuqori" (shifokorlar zudlik bilan ko'rib chiqishi kerak) bo'lgan jiddiylik darajasi
-- summary: xabarning bir yoki ikki jumlali xolis, qisqa o'zbekcha xulosasi
-- suggestedDepartment: mavjud bo'limlar ro'yxatidan eng mos keladigan bo'lim nomi
-- issueTag: muammoning snake_case formatidagi qisqa lotin-o'zbekcha kodi (masalan "dori_vaqtida_berilmadi"), o'xshash xabarlarni guruhlash uchun ishlatiladi`,
-            },
-          ],
+          messages: [{ role: "user", content: buildClassificationPrompt(input) }],
           response_format: {
             type: "json_schema",
             json_schema: {
@@ -78,27 +59,11 @@ Javobni faqat quyidagi JSON formatda qaytaring:
 
   async voiceDialogueTurn(history: VoiceTurn[]): Promise<VoiceDialogueResult> {
     const openai = client();
-    const turnCount = history.filter((t) => t.role === "patient").length;
     const response = await time("openai.voiceDialogueTurn", () =>
       withRetry(() =>
         openai.chat.completions.create({
           model: MODEL,
-          messages: [
-            {
-              role: "user",
-              content: `Siz shifoxonadagi bemor bilan ovozli suhbatlashayotgan mehribon AI yordamchisiz. Bemor to'liq anonim — ismini so'ramang.
-Vazifangiz: bemorning muammosini 2-3 savolda aniqlashtirish, so'ng suhbatni yakunlash.
-
-Hozirgacha bemor ${turnCount} marta gapirdi. Agar bu 2 yoki undan ko'p bo'lsa, muammoni tasdiqlab, suhbatni yakunlang (done: true) va rahmat ayting.
-
-Suhbat tarixi:
-${history.map((t) => `${t.role === "ai" ? "Yordamchi" : "Bemor"}: ${t.text}`).join("\n")}
-
-Javobni faqat quyidagi JSON formatda qaytaring:
-- reply: yordamchining keyingi o'zbekcha javobi (qisqa, tabiiy, bir yoki ikki jumla)
-- done: suhbatni yakunlash vaqti kelganini bildiruvchi boolean`,
-            },
-          ],
+          messages: [{ role: "user", content: buildVoiceTurnPrompt(history) }],
           response_format: {
             type: "json_schema",
             json_schema: {

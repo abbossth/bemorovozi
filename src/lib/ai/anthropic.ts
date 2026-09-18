@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { buildClassificationPrompt, buildVoiceTurnPrompt } from "./prompts";
 import type {
   AiProvider,
   ClassificationInput,
@@ -30,17 +31,7 @@ export const anthropicProvider: AiProvider = {
       messages: [
         {
           role: "user",
-          content: `Siz o'zbekiston shifoxonasidagi bemorlar fikr-mulohazasini tahlil qiluvchi yordamchisiz.
-
-Bemor bo'limi tanlagan: "${input.departmentName}"
-Mavjud bo'limlar ro'yxati: ${input.availableDepartments.join(", ")}
-
-Bemor xabari:
-"""
-${input.transcript}
-"""
-
-Faqat JSON qaytaring: { "severity": "past"|"orta"|"yuqori", "summary": string, "suggestedDepartment": string, "issueTag": string }`,
+          content: `${buildClassificationPrompt(input)}\n\nJavobni FAQAT JSON sifatida qaytaring, boshqa hech qanday matnsiz.`,
         },
       ],
     });
@@ -50,20 +41,13 @@ Faqat JSON qaytaring: { "severity": "past"|"orta"|"yuqori", "summary": string, "
 
   async voiceDialogueTurn(history: VoiceTurn[]): Promise<VoiceDialogueResult> {
     const anthropic = client();
-    const turnCount = history.filter((t) => t.role === "patient").length;
     const message = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 300,
       messages: [
         {
           role: "user",
-          content: `Siz shifoxonadagi bemor bilan ovozli suhbatlashayotgan mehribon AI yordamchisiz. Ismini so'ramang.
-Bemor ${turnCount} marta gapirdi. 2 yoki undan ko'p bo'lsa, suhbatni yakunlang (done: true).
-
-Suhbat tarixi:
-${history.map((t) => `${t.role === "ai" ? "Yordamchi" : "Bemor"}: ${t.text}`).join("\n")}
-
-Faqat JSON qaytaring: { "reply": string, "done": boolean }`,
+          content: `${buildVoiceTurnPrompt(history)}\n\nJavobni FAQAT JSON sifatida qaytaring, boshqa hech qanday matnsiz.`,
         },
       ],
     });
