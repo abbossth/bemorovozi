@@ -366,9 +366,9 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
             onClick={handleOrbTap}
             disabled={callState === "thinking" || callState === "connecting" || callState === "denied" || callState === "stuck"}
             aria-label={callState === "listening" ? "Tugatish uchun bosing" : "Ovozli suhbat"}
-            className="relative flex h-[190px] w-[190px] items-center justify-center rounded-full disabled:cursor-default"
+            className="relative flex h-[160px] w-[160px] items-center justify-center rounded-full disabled:cursor-default"
           >
-            <VoiceOrb ref={orbApiRef} phase={orbPhase} size={190} />
+            <VoiceOrb ref={orbApiRef} phase={orbPhase} size={160} />
             {callState === "denied" && (
               <svg
                 viewBox="0 0 24 24"

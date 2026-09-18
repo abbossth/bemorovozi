@@ -84,7 +84,7 @@ export const VoiceOrb = forwardRef<VoiceOrbHandle, Props>(function VoiceOrb({ ph
         return; // WebGL unavailable on this device — degrade to the plain glow div
       }
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(size, size, false);
+      renderer.setSize(size, size, true);
       containerRef.current.appendChild(renderer.domElement);
 
       function makeSpriteTexture() {
@@ -291,8 +291,8 @@ export const VoiceOrb = forwardRef<VoiceOrbHandle, Props>(function VoiceOrb({ ph
           if (currentPhase === "idle") {
             scale = 1 + Math.sin(t * 1.1) * 0.04;
           } else if (audioReactive) {
-            const pulse = Math.sin(t * 9.0) * speakLevel * 0.18;
-            scale = 1 + speakLevel * 0.14 + pulse;
+            const pulse = Math.sin(t * 10.0) * speakLevel * 0.35;
+            scale = 1 + speakLevel * 0.4 + pulse;
           } else if (currentPhase === "error") {
             scale = 1 + Math.sin(t * 0.8) * 0.02;
           }
