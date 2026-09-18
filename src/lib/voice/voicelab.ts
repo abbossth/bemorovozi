@@ -4,6 +4,8 @@
 // TTS is synchronous — POST returns the WAV bytes directly.
 // STT is asynchronous — POST returns a queued job id, which we poll until "completed".
 
+import { time, mark } from "@/lib/timing";
+
 const STT_POLL_INTERVAL_MS = 1000;
 const STT_POLL_TIMEOUT_MS = 25000;
 
@@ -34,14 +36,16 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
   form.append("language", "uz");
   form.append("include_speakers", "false");
 
-  const submitRes = await fetch(`${baseUrl}/stt`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Idempotency-Key": crypto.randomUUID(),
-    },
-    body: form,
-  });
+  const submitRes = await time("voicelab.stt.submit", () =>
+    fetch(`${baseUrl}/stt`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: form,
+    })
+  );
 
   if (!submitRes.ok) {
     throw new Error(`VoiceLab STT so'rovi muvaffaqiyatsiz: ${submitRes.status} ${await submitRes.text()}`);
@@ -50,11 +54,17 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
   const submitted = (await submitRes.json()) as SttTranscription;
 
   // Synchronous short clips can come back already completed.
-  if (submitted.status === "completed" && submitted.transcript) return submitted.transcript;
+  if (submitted.status === "completed" && submitted.transcript) {
+    mark("voicelab.stt.completedSynchronously");
+    return submitted.transcript;
+  }
 
+  const pollStart = Date.now();
+  let pollCount = 0;
   const deadline = Date.now() + STT_POLL_TIMEOUT_MS;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, STT_POLL_INTERVAL_MS));
+    pollCount++;
 
     const pollRes = await fetch(`${baseUrl}/stt/transcriptions/${submitted.id}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -64,6 +74,7 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
     const polled = (await pollRes.json()) as SttTranscription;
     if (polled.status === "completed") {
       if (!polled.transcript) throw new Error("VoiceLab STT bo'sh transkript qaytardi");
+      mark("voicelab.stt.poll.total", { pollCount, ms: Date.now() - pollStart });
       return polled.transcript;
     }
     if (polled.status === "failed") {
@@ -71,6 +82,7 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
     }
   }
 
+  mark("voicelab.stt.poll.timeout", { pollCount, ms: Date.now() - pollStart });
   throw new Error("VoiceLab STT javob berish vaqti tugadi");
 }
 
@@ -79,15 +91,17 @@ export async function textToSpeech(text: string): Promise<Buffer> {
   const { apiKey, baseUrl } = requireConfig();
   const voiceId = process.env.VOICELAB_VOICE_ID ?? "voice_01J9NEUTRAL0000000000000001"; // Gulnoza — calm, balanced uz voice
 
-  const res = await fetch(`${baseUrl}/tts`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
-    },
-    body: JSON.stringify({ text, language: "uz", voice_id: voiceId, speed: 1 }),
-  });
+  const res = await time("voicelab.tts.request", () =>
+    fetch(`${baseUrl}/tts`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({ text, language: "uz", voice_id: voiceId, speed: 1 }),
+    })
+  );
 
   if (!res.ok) {
     throw new Error(`VoiceLab TTS so'rovi muvaffaqiyatsiz: ${res.status} ${await res.text()}`);

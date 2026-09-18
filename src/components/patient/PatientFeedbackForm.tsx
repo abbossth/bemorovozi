@@ -42,6 +42,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
   async function submitTranscript(transcript: string, channel: "text" | "voice") {
     setSubmitting(true);
     setError(null);
+    const submitStart = performance.now();
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
@@ -49,6 +50,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
         body: JSON.stringify({ hospitalId, departmentId, channel, transcript }),
       });
       const data = await res.json();
+      console.log(`[timing] client.submitFeedback.${channel} ${Math.round(performance.now() - submitStart)}ms`);
       if (!res.ok) throw new Error(data.error ?? "Xatolik yuz berdi");
       setTrackingCode(data.trackingCode);
       setStage("sent");
@@ -99,29 +101,40 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
         setRecording(false);
         setVoiceBusy(true);
         setError(null);
+        // Diagnostic-only timing (see BOSQICH 1 profiling pass) — logs the
+        // client-perceived duration of each network round trip in this chain.
+        const recordingStoppedAt = performance.now();
         try {
           const audioBlob = new Blob(chunks, { type: "audio/webm" });
           const form = new FormData();
           form.append("audio", audioBlob, "voice.webm");
+          const sttStart = performance.now();
           const sttRes = await fetch("/api/voice/stt", { method: "POST", body: form });
           const sttData = await sttRes.json();
+          console.log(`[timing] client.stt ${Math.round(performance.now() - sttStart)}ms`);
           if (!sttRes.ok) throw new Error(sttData.error ?? "Ovozni tanib bo'lmadi");
 
           const nextHistory: VoiceTurn[] = [...voiceTurns, { role: "patient", text: sttData.text }];
           setVoiceTurns(nextHistory);
 
+          const turnStart = performance.now();
           const turnRes = await fetch("/api/voice/turn", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ history: nextHistory }),
           });
           const turnData = await turnRes.json();
+          console.log(`[timing] client.turn ${Math.round(performance.now() - turnStart)}ms`);
           if (!turnRes.ok) throw new Error(turnData.error ?? "Yordamchi javob bera olmadi");
 
           setVoiceTurns([...nextHistory, { role: "ai", text: turnData.reply }]);
           setVoiceDone(Boolean(turnData.done));
+          console.log(
+            `[timing] client.sttPlusTurn.total ${Math.round(performance.now() - recordingStoppedAt)}ms (recording-stop to reply-visible)`
+          );
 
           // Best-effort playback — voice mode still works via the chat transcript if TTS isn't configured.
+          const ttsStart = performance.now();
           fetch("/api/voice/tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -129,6 +142,7 @@ export function PatientFeedbackForm({ hospitalId, departmentId, departmentName, 
           })
             .then((r) => (r.ok ? r.arrayBuffer() : null))
             .then((buf) => {
+              console.log(`[timing] client.tts ${Math.round(performance.now() - ttsStart)}ms`);
               if (!buf || !audioRef.current) return;
               const url = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
               audioRef.current.src = url;
