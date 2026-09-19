@@ -9,7 +9,7 @@ import { NewFeedbackToasts, type Toast } from "@/components/dashboard/NewFeedbac
 import { PushNotificationBanner } from "@/components/dashboard/PushNotificationBanner";
 import { isNotifyEnabled, showLocalNotification } from "@/components/dashboard/localNotify";
 import { buildFeedbackPayload } from "@/lib/push/payload";
-import { Tag } from "@/components/Tag";
+import { SystemicTag, Tag } from "@/components/Tag";
 import { Avatar } from "@/components/Avatar";
 import { OverviewPanel, type Overview } from "@/components/dashboard/OverviewPanel";
 import { FilterBar, SearchBox, type RangeKey } from "@/components/dashboard/FilterBar";
@@ -365,7 +365,7 @@ export function FeedbackDashboard() {
                     </span>
                     {item.kind === "taklif" && <Tag tone="success">Taklif</Tag>}
                     {item.routedToManagement && <Tag tone="warning">Rahbariyatga</Tag>}
-                    {item.isSystemic && <Tag tone="warning">Tizimli muammo · {item.clusterCount}</Tag>}
+                    {item.isSystemic && <SystemicTag count={item.clusterCount} />}
                   </div>
                   <time
                     dateTime={item.createdAt}
