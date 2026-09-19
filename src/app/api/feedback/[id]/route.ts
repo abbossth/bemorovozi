@@ -16,11 +16,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await connectDB();
 
-  const feedback = await Feedback.findOneAndUpdate(
-    { _id: id, hospitalId: staff.hospitalId },
-    { status: parsed.data.status },
-    { returnDocument: "after" }
-  );
+  // Remember who picked it up / closed it, so the panel can say "Ko'rib chiqmoqda: Malika A.".
+  const set: Record<string, string> = { status: parsed.data.status };
+  if (parsed.data.status === "korib_chiqilmoqda") set.reviewedByName = staff.name;
+  if (parsed.data.status === "hal_qilindi") set.resolvedByName = staff.name;
+  const update =
+    parsed.data.status === "yangi" ? { $set: set, $unset: { reviewedByName: "", resolvedByName: "" } } : { $set: set };
+
+  const feedback = await Feedback.findOneAndUpdate({ _id: id, hospitalId: staff.hospitalId }, update, {
+    returnDocument: "after",
+  });
 
   if (!feedback) return NextResponse.json({ error: "Topilmadi" }, { status: 404 });
 

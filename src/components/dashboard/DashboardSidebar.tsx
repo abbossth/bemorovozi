@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogoMark } from "@/components/Logo";
+import { Avatar } from "@/components/Avatar";
 
 const NAV = [
   {
@@ -84,12 +85,7 @@ function SidebarContent({
 
       <div className="mt-auto flex flex-col gap-1 border-t border-white/10 pt-4">
         <div className="flex items-center gap-3 px-1 py-1.5">
-          <span
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-teal font-heading text-sm font-extrabold text-white"
-            aria-hidden
-          >
-            {(staffName.trim()[0] ?? "?").toUpperCase()}
-          </span>
+          <Avatar name={staffName} size={36} />
           <div className="flex min-w-0 flex-col leading-tight">
             <span className="truncate text-sm font-semibold text-white">{staffName}</span>
             <span className="truncate text-xs text-white/60">{staffRole}</span>

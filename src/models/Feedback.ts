@@ -28,6 +28,9 @@ const FeedbackSchema = new Schema(
     roomOrWard: { type: String },
     staffName: { type: String },
     occurredAt: { type: String }, // "when", as the patient described it ("Bugun, tushdan keyin")
+    // Who is handling / who resolved it (full names of Staff; shown shortened in the panel).
+    reviewedByName: { type: String },
+    resolvedByName: { type: String },
     // Staff-conduct complaints skip the department and notify management directly.
     routedToManagement: { type: Boolean, default: false },
     // The full back-and-forth (assistant + patient). `transcript` keeps only the patient's own words.

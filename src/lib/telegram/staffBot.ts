@@ -150,6 +150,8 @@ export function getStaffBot() {
     }
 
     feedback.status = nextStatus;
+    if (action === "review") feedback.reviewedByName = staff.name;
+    else feedback.resolvedByName = staff.name;
     await feedback.save();
 
     const statusLine = actionStatusLine(action, staff.name);

@@ -10,6 +10,10 @@ import { PushNotificationBanner } from "@/components/dashboard/PushNotificationB
 import { isNotifyEnabled, showLocalNotification } from "@/components/dashboard/localNotify";
 import { buildFeedbackPayload } from "@/lib/push/payload";
 import { Tag } from "@/components/Tag";
+import { Avatar } from "@/components/Avatar";
+import { OverviewPanel, type Overview } from "@/components/dashboard/OverviewPanel";
+import { shortName } from "@/lib/ui/format";
+import { CLUSTER_WINDOW_DAYS } from "@/lib/clusters";
 import { IDLE, SELECTED, TONE } from "@/lib/ui/tones";
 import { playSeverityAlert } from "@/lib/notificationSound";
 import type { Severity } from "@/lib/ai/types";
@@ -29,6 +33,8 @@ type FeedbackItem = {
   staffName: string | null;
   occurredAt: string | null;
   routedToManagement: boolean;
+  reviewedByName: string | null;
+  resolvedByName: string | null;
   /** full assistant + patient exchange (web chat/voice submissions only) */
   conversation: { role: "assistant" | "patient"; text: string }[] | null;
   isSystemic: boolean;
@@ -38,9 +44,21 @@ type FeedbackItem = {
 type DashboardResponse = {
   items: FeedbackItem[];
   stats: { todayCount: number; highCount: number; avgResponseMinutes: number | null };
+  overview: Overview;
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+// An expired session used to make this component crash on `data.stats` — send the user to the login instead.
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (res.status === 401) {
+    window.location.replace("/login");
+    throw new Error("Sessiya tugagan");
+  }
+  return res.json();
+};
+
+// Day buckets and "today" follow this browser's clock (minutes east of UTC), not the server's.
+const TZ_QUERY = () => `?tz=${-new Date().getTimezoneOffset()}`;
 
 const FILTERS: { value: "all" | Severity; label: string }[] = [
   { value: "all", label: "Hammasi" },
@@ -65,7 +83,7 @@ function formatWhen(iso: string) {
 }
 
 export function FeedbackDashboard() {
-  const { data, mutate } = useSWR<DashboardResponse>("/api/dashboard/feedback", fetcher, {
+  const { data, mutate } = useSWR<DashboardResponse>(`/api/dashboard/feedback${TZ_QUERY()}`, fetcher, {
     refreshInterval: 15000,
     // Keep polling while the tab is in the background — that is exactly when a notification is wanted.
     refreshWhenHidden: true,
@@ -85,6 +103,11 @@ export function FeedbackDashboard() {
     [items, filter]
   );
   const selected = items.find((i) => i.id === selectedId) ?? null;
+  const byDepartment = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of filtered) counts.set(item.dept, (counts.get(item.dept) ?? 0) + 1);
+    return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  }, [filtered]);
   const today = new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long" });
 
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -246,7 +269,26 @@ export function FeedbackDashboard() {
         <div className="flex min-h-0 w-full flex-shrink-0 flex-col rounded-[14px] border border-gray-200 bg-white p-5 sm:p-6 lg:w-[360px] lg:overflow-y-auto">
           {selected ? (
             <div className="flex flex-grow flex-col gap-4">
-              <SeverityBadge severity={selected.severity} suffix="jiddiylik" />
+              <div className="flex flex-wrap items-center gap-2">
+                <SeverityBadge severity={selected.severity} suffix="jiddiylik" />
+                {selected.kind === "taklif" && <Tag tone="success">Taklif</Tag>}
+                {selected.routedToManagement && <Tag tone="warning">Rahbariyatga</Tag>}
+              </div>
+              {selected.isSystemic && (
+                <div
+                  className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm leading-snug"
+                  style={{ background: TONE.warning.bg, color: TONE.warning.fg }}
+                  data-testid="systemic-notice"
+                >
+                  <svg viewBox="0 0 24 24" width={18} height={18} className="mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M17 2l4 4-4 4M3 11V9a3 3 0 013-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 01-3 3H3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>
+                    <b>Bu muammo so&apos;nggi {CLUSTER_WINDOW_DAYS} kunda {selected.clusterCount} marta takrorlangan.</b>{" "}
+                    Tizimli sabab bo&apos;lishi mumkin.
+                  </span>
+                </div>
+              )}
               <p className="text-[15px] leading-relaxed text-ink">{selected.excerpt}</p>
               <p className="text-sm leading-relaxed text-gray-500">{selected.summary}</p>
               <div className="flex flex-col gap-2.5 border-t border-gray-200 pt-2">
@@ -296,6 +338,23 @@ export function FeedbackDashboard() {
                 </div>
               </div>
 
+              {selected.status === "korib_chiqilmoqda" && selected.reviewedByName && (
+                <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ background: TONE.warning.bg }} data-testid="reviewer">
+                  <Avatar name={selected.reviewedByName} size={28} />
+                  <span className="text-sm" style={{ color: TONE.warning.fg }}>
+                    Ko&apos;rib chiqmoqda: <b>{shortName(selected.reviewedByName)}</b>
+                  </span>
+                </div>
+              )}
+              {selected.status === "hal_qilindi" && selected.resolvedByName && (
+                <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ background: TONE.success.bg }} data-testid="reviewer">
+                  <Avatar name={selected.resolvedByName} size={28} />
+                  <span className="text-sm" style={{ color: TONE.success.fg }}>
+                    Hal qildi: <b>{shortName(selected.resolvedByName)}</b>
+                  </span>
+                </div>
+              )}
+
               {selected.conversation && selected.conversation.length > 0 && (
                 <details className="rounded-xl border border-gray-200 bg-[#F7F9F8] p-3 text-sm">
                   <summary className="cursor-pointer font-semibold text-ink">To&apos;liq suhbat</summary>
@@ -310,28 +369,29 @@ export function FeedbackDashboard() {
                 </details>
               )}
 
-              {selected.status === "hal_qilindi" ? (
-                <div className="mt-auto flex items-center gap-2 text-sm font-semibold text-teal">
-                  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke={TONE.success.fg} strokeWidth={2}>
-                    <path d="M5 12.5l4 4 10-11" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Hal qilindi
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={advancing}
-                  onClick={() => advanceStatus(selected)}
-                  className="mt-auto w-full rounded-[10px] bg-teal py-3.5 font-heading text-[15px] font-bold text-white disabled:opacity-60"
-                >
-                  {NEXT_STATUS_LABEL[selected.status]}
-                </button>
-              )}
+              {/* Pinned to the bottom of the panel so the main action never scrolls out of view */}
+              <div className="sticky bottom-0 -mx-5 mt-auto bg-white px-5 pb-1 pt-3 sm:-mx-6 sm:px-6">
+                {selected.status === "hal_qilindi" ? (
+                  <div className="mt-auto flex items-center gap-2 text-sm font-semibold text-teal">
+                    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke={TONE.success.fg} strokeWidth={2}>
+                      <path d="M5 12.5l4 4 10-11" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Hal qilindi
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={advancing}
+                    onClick={() => advanceStatus(selected)}
+                    className="mt-auto w-full rounded-[10px] bg-teal py-3.5 font-heading text-[15px] font-bold text-white disabled:opacity-60"
+                  >
+                    {NEXT_STATUS_LABEL[selected.status]}
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
-            <div className="flex flex-grow items-center justify-center text-center">
-              <p className="max-w-[220px] text-sm text-gray-500">Batafsil ko&apos;rish uchun ro&apos;yxatdan xabarni tanlang.</p>
-            </div>
+            <OverviewPanel overview={data?.overview} byDepartment={byDepartment} />
           )}
         </div>
       </div>
