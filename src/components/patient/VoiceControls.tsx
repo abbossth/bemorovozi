@@ -49,6 +49,9 @@ function getAudioContextCtor(): typeof AudioContext | null {
 
 export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtterance, onSwitchToText }: Props) {
   const [phase, setPhase] = useState<Phase>("connecting");
+  // The patient switched the microphone off: nothing is recorded and the assistant does not start listening.
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [noSpeechHint, setNoSpeechHint] = useState(false);
@@ -250,6 +253,10 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
   function startListening() {
     const stream = streamRef.current;
     if (!stream || !activeRef.current) return;
+    if (mutedRef.current) {
+      setPhase("idle");
+      return;
+    }
     // Never two listening sessions at once.
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     discardRecorder();
@@ -419,7 +426,7 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
     // A newer message (or an interruption) took over while this one was playing.
     if (!activeRef.current || id !== playIdRef.current) return;
     // Also while the card is showing: the patient can answer it aloud ("ha, yuboring") instead of tapping.
-    if (stageRef.current !== "done" && !busyRef.current) startListening();
+    if (stageRef.current !== "done" && !busyRef.current && !mutedRef.current) startListening();
     else setPhase("idle");
   }
 
@@ -496,6 +503,25 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
     }
   }
 
+  // Mic on/off. Off = the audio track is disabled (silence, nothing reaches the recorder) and any
+  // recording in progress is thrown away; the assistant keeps talking and the buttons keep working.
+  function toggleMute() {
+    const next = !mutedRef.current;
+    mutedRef.current = next;
+    setMuted(next);
+    streamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = !next;
+    });
+    if (next) {
+      if (phase === "listening") {
+        abortListening();
+        setPhase("idle");
+      }
+    } else if ((phase === "idle" || phase === "listening") && stageRef.current !== "done" && !busyRef.current) {
+      startListening();
+    }
+  }
+
   function handleRetry() {
     consecutiveErrorsRef.current = 0;
     emptyTranscriptsRef.current = 0;
@@ -504,6 +530,9 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
   }
 
   const shown: Phase = busy && phase !== "speaking" && phase !== "denied" && phase !== "stuck" ? "thinking" : phase;
+
+  // Off wins over "waiting for your answer"; it never hides speaking / thinking / errors.
+  const showMuted = muted && (shown === "idle" || shown === "listening");
 
   const label: Record<Phase, string> = {
     connecting: "Ulanmoqda...",
@@ -545,7 +574,9 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
         <button
           type="button"
           onClick={handleOrbTap}
-          disabled={shown === "thinking" || shown === "connecting" || shown === "denied" || shown === "stuck"}
+          disabled={
+            showMuted || shown === "thinking" || shown === "connecting" || shown === "denied" || shown === "stuck"
+          }
           aria-label={shown === "listening" ? "Tugatish uchun bosing" : "Ovozli suhbat"}
           className="relative flex h-[76px] w-[76px] flex-shrink-0 items-center justify-center rounded-full disabled:cursor-default"
         >
@@ -553,14 +584,40 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
         </button>
 
         <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-sm font-bold text-ink">{label[shown]}</span>
+          <span className="text-sm font-bold text-ink">{showMuted ? "Mikrofon o'chiq" : label[shown]}</span>
           {micError && shown !== "stuck" ? (
             <span className="text-xs leading-relaxed text-coral">{micError}</span>
           ) : (
-            <span className="text-xs leading-relaxed text-gray-500">{hint[shown]}</span>
+            <span className="text-xs leading-relaxed text-gray-500">
+              {showMuted ? "Gapirish uchun mikrofonni yoqing" : hint[shown]}
+            </span>
           )}
           {vadDebug && shown === "listening" && <span className="font-mono text-[11px] text-gray-400">{vadDebug}</span>}
         </div>
+
+        {/* Shows the action: mic ON → red "mic off" (tap to switch it off); mic OFF → the plain mic (tap to switch it on) */}
+        {shown !== "connecting" && shown !== "denied" && (
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-pressed={muted}
+            aria-label={muted ? "Mikrofonni yoqish" : "Mikrofonni o'chirish"}
+            title={muted ? "Mikrofonni yoqish" : "Mikrofonni o'chirish"}
+            data-testid="mic-toggle"
+            data-muted={muted}
+            className={`ml-auto flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] transition ${
+              muted
+                ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                : "border-coral/30 bg-coral-tint text-coral hover:bg-coral/15"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={1.9} aria-hidden>
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" strokeLinecap="round" />
+              {!muted && <path d="M4 4l16 16" strokeLinecap="round" />}
+            </svg>
+          </button>
+        )}
       </div>
 
       {(shown === "stuck" || shown === "denied") && (
