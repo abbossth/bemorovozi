@@ -37,7 +37,15 @@ const NAV = [
   },
 ];
 
-function SidebarContent({ staffName, onNavigate }: { staffName: string; onNavigate?: () => void }) {
+function SidebarContent({
+  staffName,
+  staffRole,
+  onNavigate,
+}: {
+  staffName: string;
+  staffRole: string;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -49,7 +57,7 @@ function SidebarContent({ staffName, onNavigate }: { staffName: string; onNaviga
 
   return (
     <div className="flex h-full w-60 flex-shrink-0 flex-col bg-navy px-5 py-7">
-      <div className="mb-10 flex items-center gap-2.5 px-1">
+      <div className="mb-6 flex items-center gap-2.5 px-1">
         <LogoMark size={30} />
         <span className="font-heading text-base font-extrabold text-white">BemorOvozi</span>
       </div>
@@ -74,13 +82,27 @@ function SidebarContent({ staffName, onNavigate }: { staffName: string; onNaviga
         })}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-2 px-1">
-        <span className="truncate text-xs text-white/50">{staffName}</span>
+      <div className="mt-auto flex flex-col gap-1 border-t border-white/10 pt-4">
+        <div className="flex items-center gap-3 px-1 py-1.5">
+          <span
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-teal font-heading text-sm font-extrabold text-white"
+            aria-hidden
+          >
+            {(staffName.trim()[0] ?? "?").toUpperCase()}
+          </span>
+          <div className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate text-sm font-semibold text-white">{staffName}</span>
+            <span className="truncate text-xs text-white/60">{staffRole}</span>
+          </div>
+        </div>
         <button
           type="button"
           onClick={handleLogout}
-          className="self-start text-xs font-semibold text-white/70 hover:text-white"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
         >
+          <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}>
+            <path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
           Chiqish
         </button>
       </div>
@@ -88,7 +110,15 @@ function SidebarContent({ staffName, onNavigate }: { staffName: string; onNaviga
   );
 }
 
-export function DashboardSidebar({ staffName, children }: { staffName: string; children: React.ReactNode }) {
+export function DashboardSidebar({
+  staffName,
+  staffRole,
+  children,
+}: {
+  staffName: string;
+  staffRole: string;
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const activeLabel = NAV.find((n) => n.href === pathname)?.label ?? "BemorOvozi";
@@ -97,7 +127,7 @@ export function DashboardSidebar({ staffName, children }: { staffName: string; c
     <div className="flex min-h-screen w-full bg-[#F7F9F8] md:min-w-0">
       {/* Desktop sidebar */}
       <div className="hidden md:block">
-        <SidebarContent staffName={staffName} />
+        <SidebarContent staffName={staffName} staffRole={staffRole} />
       </div>
 
       {/* Mobile off-canvas drawer */}
@@ -109,7 +139,7 @@ export function DashboardSidebar({ staffName, children }: { staffName: string; c
             onClick={() => setOpen(false)}
           />
           <div className="relative z-10 h-full w-60 shadow-2xl">
-            <SidebarContent staffName={staffName} onNavigate={() => setOpen(false)} />
+            <SidebarContent staffName={staffName} staffRole={staffRole} onNavigate={() => setOpen(false)} />
           </div>
         </div>
       )}

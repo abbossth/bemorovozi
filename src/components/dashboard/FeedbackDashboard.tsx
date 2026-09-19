@@ -53,6 +53,17 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** "14:25" for today, "Kecha 14:25" for yesterday, "12-sen 14:25" otherwise — the list can now span weeks. */
+function formatWhen(iso: string) {
+  const date = new Date(iso);
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
+  const time = formatTime(iso);
+  if (days <= 0) return time;
+  if (days === 1) return `Kecha ${time}`;
+  return `${date.toLocaleDateString("uz-UZ", { day: "numeric", month: "short" })} ${time}`;
+}
+
 export function FeedbackDashboard() {
   const { data, mutate } = useSWR<DashboardResponse>("/api/dashboard/feedback", fetcher, {
     refreshInterval: 15000,
@@ -148,7 +159,7 @@ export function FeedbackDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:h-screen lg:gap-7 lg:overflow-hidden lg:px-12 lg:py-10">
+    <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 sm:py-6 lg:h-screen lg:gap-5 lg:overflow-hidden lg:px-12 lg:py-8">
       <NewFeedbackToasts toasts={toasts} onDismiss={dismissToast} onSelect={setSelectedId} />
       <div className="flex-shrink-0">
         <h1 className="font-heading text-2xl font-extrabold text-ink lg:text-[28px]">Xabarlar</h1>
@@ -159,7 +170,7 @@ export function FeedbackDashboard() {
 
       <PushNotificationBanner />
 
-      <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
+      <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} />
         <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor={TONE.danger.fg} />
         <StatCard
@@ -201,26 +212,32 @@ export function FeedbackDashboard() {
                 key={item.id}
                 type="button"
                 onClick={() => setSelectedId(item.id)}
-                className="flex w-full flex-col gap-2.5 rounded-xl border-[1.5px] p-4 text-left"
+                className="flex w-full flex-col gap-2 rounded-xl border-[1.5px] px-4 py-3 text-left"
                 style={{
                   background: (active ? SELECTED : IDLE).bg,
                   borderColor: (active ? SELECTED : IDLE).border,
                 }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                {/* One compact row: severity · status · department · flags, with the time pulled out on the right */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <SeverityBadge severity={item.severity} />
+                    <StatusBadge status={item.status} />
+                    <span className="rounded-full bg-gray-100 px-2.5 py-[3px] text-xs font-medium text-gray-600">
+                      {item.dept}
+                    </span>
                     {item.kind === "taklif" && <Tag tone="success">Taklif</Tag>}
                     {item.routedToManagement && <Tag tone="warning">Rahbariyatga</Tag>}
                     {item.isSystemic && <Tag tone="warning">Tizimli muammo · {item.clusterCount}</Tag>}
                   </div>
-                  <span className="text-[13px] text-gray-500">{formatTime(item.createdAt)}</span>
+                  <time
+                    dateTime={item.createdAt}
+                    className="flex-shrink-0 pt-0.5 font-heading text-[15px] font-extrabold tabular-nums text-ink"
+                  >
+                    {formatWhen(item.createdAt)}
+                  </time>
                 </div>
-                <p className="text-[15px] leading-relaxed text-ink">{item.summary}</p>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-gray-100 px-2.5 py-[3px] text-xs text-gray-500">{item.dept}</span>
-                  <StatusBadge status={item.status} />
-                </div>
+                <p className="text-[15px] leading-snug text-ink">{item.summary}</p>
               </button>
             );
           })}

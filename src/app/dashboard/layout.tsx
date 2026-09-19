@@ -6,5 +6,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const staff = await getCurrentStaff();
   if (!staff) redirect("/login");
 
-  return <DashboardSidebar staffName={staff.name}>{children}</DashboardSidebar>;
+  const staffRole = staff.role === "admin" ? "Administrator" : "Xodim";
+
+  return (
+    <DashboardSidebar staffName={staff.name} staffRole={staffRole}>
+      {children}
+    </DashboardSidebar>
+  );
 }
