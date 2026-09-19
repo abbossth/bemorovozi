@@ -1,9 +1,10 @@
 import type { Severity } from "@/lib/ai/types";
+import { TONE } from "@/lib/ui/tones";
 
 export const SEVERITY_META: Record<Severity, { label: string; color: string; bg: string }> = {
-  yuqori: { label: "Yuqori", color: "#E5534B", bg: "#FCEBEA" },
-  orta: { label: "O'rta", color: "#B36B00", bg: "#FDF3E4" },
-  past: { label: "Past", color: "#0F6E5C", bg: "#EAF5F2" },
+  yuqori: { label: "Yuqori", color: TONE.danger.fg, bg: TONE.danger.bg },
+  orta: { label: "O'rta", color: TONE.warning.fg, bg: TONE.warning.bg },
+  past: { label: "Past", color: TONE.success.fg, bg: TONE.success.bg },
 };
 
 export function SeverityBadge({ severity, suffix }: { severity: Severity; suffix?: string }) {

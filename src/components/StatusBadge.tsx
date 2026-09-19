@@ -1,9 +1,11 @@
+import { TONE } from "@/lib/ui/tones";
+
 export type Status = "yangi" | "korib_chiqilmoqda" | "hal_qilindi";
 
 export const STATUS_META: Record<Status, { label: string; color: string; bg: string }> = {
-  yangi: { label: "Yangi", color: "#4B5563", bg: "#F3F4F6" },
-  korib_chiqilmoqda: { label: "Ko'rib chiqilmoqda", color: "#B36B00", bg: "#FDF3E4" },
-  hal_qilindi: { label: "Hal qilindi", color: "#0F6E5C", bg: "#EAF5F2" },
+  yangi: { label: "Yangi", color: TONE.neutral.fg, bg: TONE.neutral.bg },
+  korib_chiqilmoqda: { label: "Ko'rib chiqilmoqda", color: TONE.warning.fg, bg: TONE.warning.bg },
+  hal_qilindi: { label: "Hal qilindi", color: TONE.success.fg, bg: TONE.success.bg },
 };
 
 export const NEXT_STATUS: Partial<Record<Status, Status>> = {

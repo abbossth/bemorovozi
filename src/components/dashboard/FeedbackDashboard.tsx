@@ -9,6 +9,8 @@ import { NewFeedbackToasts, type Toast } from "@/components/dashboard/NewFeedbac
 import { PushNotificationBanner } from "@/components/dashboard/PushNotificationBanner";
 import { isNotifyEnabled, showLocalNotification } from "@/components/dashboard/localNotify";
 import { buildFeedbackPayload } from "@/lib/push/payload";
+import { Tag } from "@/components/Tag";
+import { IDLE, SELECTED, TONE } from "@/lib/ui/tones";
 import { playSeverityAlert } from "@/lib/notificationSound";
 import type { Severity } from "@/lib/ai/types";
 
@@ -159,7 +161,7 @@ export function FeedbackDashboard() {
 
       <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
         <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} />
-        <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor="#E5534B" />
+        <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor={TONE.danger.fg} />
         <StatCard
           label="O'rtacha javob vaqti"
           value={data?.stats.avgResponseMinutes != null ? `${data.stats.avgResponseMinutes} daqiqa` : "—"}
@@ -176,9 +178,9 @@ export function FeedbackDashboard() {
               onClick={() => setFilter(f.value)}
               className="flex-shrink-0 rounded-full border-[1.5px] px-[18px] py-2 text-sm font-semibold"
               style={{
-                borderColor: active ? "#0F6E5C" : "#E4E7EB",
-                background: active ? "#EAF5F2" : "#FFFFFF",
-                color: active ? "#0F6E5C" : "#4B5563",
+                borderColor: (active ? SELECTED : IDLE).border,
+                background: (active ? SELECTED : IDLE).bg,
+                color: (active ? SELECTED : IDLE).fg,
               }}
             >
               {f.label}
@@ -201,26 +203,16 @@ export function FeedbackDashboard() {
                 onClick={() => setSelectedId(item.id)}
                 className="flex w-full flex-col gap-2.5 rounded-xl border-[1.5px] p-4 text-left"
                 style={{
-                  background: active ? "#EAF5F2" : "#FFFFFF",
-                  borderColor: active ? "#0F6E5C" : "#E4E7EB",
+                  background: (active ? SELECTED : IDLE).bg,
+                  borderColor: (active ? SELECTED : IDLE).border,
                 }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <SeverityBadge severity={item.severity} />
-                    {item.kind === "taklif" && (
-                      <span className="rounded-full bg-teal-tint px-2.5 py-1 text-xs font-bold text-teal">Taklif</span>
-                    )}
-                    {item.routedToManagement && (
-                      <span className="rounded-full bg-amber-tint px-2.5 py-1 text-xs font-bold text-amber">
-                        Rahbariyatga
-                      </span>
-                    )}
-                    {item.isSystemic && (
-                      <span className="rounded-full bg-amber-tint px-2.5 py-1 text-xs font-bold text-amber">
-                        Tizimli muammo · {item.clusterCount}
-                      </span>
-                    )}
+                    {item.kind === "taklif" && <Tag tone="success">Taklif</Tag>}
+                    {item.routedToManagement && <Tag tone="warning">Rahbariyatga</Tag>}
+                    {item.isSystemic && <Tag tone="warning">Tizimli muammo · {item.clusterCount}</Tag>}
                   </div>
                   <span className="text-[13px] text-gray-500">{formatTime(item.createdAt)}</span>
                 </div>
@@ -252,7 +244,7 @@ export function FeedbackDashboard() {
                 {selected.routedToManagement && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Yo&apos;nalish</span>
-                    <span className="font-semibold text-amber">Rahbariyatga</span>
+                    <span className="font-semibold" style={{ color: TONE.warning.fg }}>Rahbariyatga</span>
                   </div>
                 )}
                 {selected.room && (
@@ -303,7 +295,7 @@ export function FeedbackDashboard() {
 
               {selected.status === "hal_qilindi" ? (
                 <div className="mt-auto flex items-center gap-2 text-sm font-semibold text-teal">
-                  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="#0F6E5C" strokeWidth={2}>
+                  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke={TONE.success.fg} strokeWidth={2}>
                     <path d="M5 12.5l4 4 10-11" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Hal qilindi
