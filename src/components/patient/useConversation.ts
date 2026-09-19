@@ -58,12 +58,15 @@ export function useConversation(initial: { token: string; view: ConversationView
     }
   }, []);
 
-  /** Sends what the patient typed or said. Resolves true when the assistant's reply is in. */
+  /**
+   * Sends what the patient typed or said. Resolves true when the assistant's reply is in. While the card
+   * is showing this also carries "ha, yubor" / "yo'q" / "yangidan boshlash" — the server acts on them like the buttons.
+   */
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, channel: "text" | "voice" = "text") => {
       setPendingText(text);
       try {
-        return await call({ action: "message", text });
+        return await call({ action: "message", text, channel });
       } finally {
         setPendingText(null);
       }

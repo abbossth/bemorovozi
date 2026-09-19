@@ -21,8 +21,8 @@ export type ChatMessage = {
   text: string;
   /** set on the assistant message that presents the confirmation card */
   card?: Card;
-  /** an off-topic exchange (patient message + the refusal): shown in the chat, never stored */
-  offTopic?: boolean;
+  /** shown in the chat but never stored or classified: off-topic exchanges and spoken/typed button presses ("ha, yubor") */
+  transient?: boolean;
 };
 
 /**
@@ -56,6 +56,12 @@ export type ConversationView = {
 
 export type ModelField = "department" | "room" | "staff" | "when";
 
+/**
+ * While the confirmation card is showing, what the patient's reply means — the same three choices the
+ * buttons offer, plus "gave new info / a correction". "not_applicable" whenever no card is showing.
+ */
+export type CardReply = "confirm" | "wants_to_continue" | "restart" | "provides_info" | "not_applicable";
+
 /** Structured output requested from Gemini on every patient message. */
 export type ModelOutput = {
   stage: "clarifying" | "ready_to_confirm";
@@ -70,10 +76,13 @@ export type ModelOutput = {
   next_question_field: ModelField | null;
   clarification_count: number;
   route_to_management: boolean;
+  card_reply: CardReply;
 };
 
 export type ModelInput = {
   state: ConversationState;
+  /** the confirmation card was on screen when this message arrived */
+  cardShowing: boolean;
   /** clarifying questions already asked */
   asked: number;
   /** how many more are allowed (0 = the model must move to confirmation) */

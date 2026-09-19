@@ -22,6 +22,7 @@ const outputSchema = z.object({
   next_question_field: z.enum(["department", "room", "staff", "when"]).nullable(),
   clarification_count: z.number(),
   route_to_management: z.boolean(),
+  card_reply: z.enum(["confirm", "wants_to_continue", "restart", "provides_info", "not_applicable"]),
 });
 
 const responseSchema = {
@@ -39,6 +40,10 @@ const responseSchema = {
     next_question_field: { type: Type.STRING, enum: ["department", "room", "staff", "when"], nullable: true },
     clarification_count: { type: Type.NUMBER },
     route_to_management: { type: Type.BOOLEAN },
+    card_reply: {
+      type: Type.STRING,
+      enum: ["confirm", "wants_to_continue", "restart", "provides_info", "not_applicable"],
+    },
   },
   required: [
     "stage",
@@ -53,8 +58,19 @@ const responseSchema = {
     "next_question_field",
     "clarification_count",
     "route_to_management",
+    "card_reply",
   ],
 };
+
+// Shown to the model only while the confirmation card is on screen: the patient can answer the three
+// buttons ("Ha, to'g'ri — yubor" / "Yo'q, davom etaman" / "Yangidan boshlash") by voice or text instead.
+const CARD_REPLY_RULES = `5) TASDIQLASH KARTASI KO'RSATILGAN
+Bemorga yig'ilgan karta ko'rsatilgan va "Shu to'g'rimi?" deb so'ralgan. Uning oxirgi xabari shu savolga javob. card_reply ni belgilang:
+- "confirm": bemor kartani to'g'ri deb tasdiqlayapti va yuborishga rozi ("ha", "xa", "to'g'ri", "hammasi joyida", "hammasi to'g'ri", "yubor", "yuboring", "yuborsang bo'ladi", "yuboraver", "ok", "xop", "tasdiqlayman") va HECH QANDAY yangi ma'lumot yoki tuzatish qo'shmayapti. Bu holatda maydonlarni O'ZGARTIRMANG — joriy qiymatlarni aynan qaytaring.
+- "wants_to_continue": bemor rozi emas yoki yana qo'shmoqchi, lekin hali yangi ma'lumot bermayapti ("yo'q", "noto'g'ri", "to'g'ri emas", "davom etaman", "qo'shmoqchiman", "yana aytaman").
+- "restart": bemor hammasini boshidan boshlamoqchi ("yangidan boshlash", "boshidan boshlaymiz", "hammasini o'chir", "qaytadan").
+- "provides_info": bemor yangi ma'lumot beryapti yoki tuzatyapti ("yo'q, 5-xona edi", "ha, lekin kecha bo'lgan", "xodim Karimov edi") — maydonlarni shunga qarab yangilang. Tasdiq bilan birga biror tuzatish yoki qo'shimcha bo'lsa ham "provides_info". Shubhali holatda "confirm" EMAS, "provides_info" tanlang.
+Karta ko'rsatilgan paytda bemor mavzudan tashqari narsa yozsa — on_topic=false.`;
 
 export function buildSystemInstruction(input: ModelInput) {
   const { state } = input;
@@ -90,6 +106,8 @@ DOIRA (QAT'IY)
 - short_summary: bemor aytgan faktlarga asoslangan 1–2 jumlali xolis, qisqa o'zbekcha tavsif (o'ylab topmang).
 - assistant_reply_text: HAR DOIM o'zbek tilida (lotin), qisqa, tabiiy, mehribon, ko'pi bilan 2 jumla. Bemor rus yoki boshqa tilda yozsa ham o'zbekcha javob bering. stage="clarifying" bo'lsa — aynan bitta savol. stage="ready_to_confirm" bo'lsa — qisqa tushundim/rahmat jumlasi (tasdiqlash so'rovini tizim o'zi qo'shadi).
 - clarification_count: hozirgacha berilgan savollar soni (agar hozir savol bersangiz, +1).
+
+${input.cardShowing ? CARD_REPLY_RULES : '5) card_reply: karta ko\'rsatilmagan — har doim "not_applicable".'}
 
 Faqat berilgan JSON sxemaga mos javob qaytaring.`;
 }

@@ -2,7 +2,7 @@
 // is non-deterministic). Run it after touching model.ts:
 //   LIVE_GEMINI=1 node --env-file=.env.local node_modules/.bin/vitest run src/lib/conversation/live.eval.test.ts
 import { describe, expect, it } from "vitest";
-import { createInitialState, handleMessage, MAX_CLARIFICATIONS, OFF_TOPIC_REPLY } from "./engine";
+import { createInitialState, handleMessage, handleMessageWithIntent, MAX_CLARIFICATIONS, OFF_TOPIC_REPLY } from "./engine";
 import { callConversationModel } from "./model";
 import type { ConversationState } from "./types";
 
@@ -93,4 +93,45 @@ live("live Gemini conversation quality", () => {
     expect(s.card?.when?.toLowerCase()).toMatch(/kecha|10|soat/);
     void asked;
   }, 120000);
+
+  describe("card replies (voice/text instead of the buttons)", () => {
+    const cardState = () => say(fresh(), "Kardiologiya bo'limida, 4-xonada juda sovuq");
+    const reply = async (text: string) => {
+      const shown = await cardState();
+      expect(shown.stage).toBe("confirming");
+      const r = await handleMessageWithIntent(shown, text, callConversationModel);
+      console.log(`"${text}" →`, r.intent, "| stage:", r.state.stage, "| card room:", r.state.card?.room);
+      return r;
+    };
+
+    it.each([
+      "Ha, hammasi to'g'ri, yuborsang bo'ladi.",
+      "Ha, to'g'ri",
+      "yuboring",
+      "Hammasi joyida, yuboraver",
+      "Xop, ok",
+    ])("confirms: %s", async (text) => {
+      expect((await reply(text)).intent).toBe("confirm");
+    }, 90000);
+
+    it.each(["Yo'q", "Yo'q, davom etaman", "To'g'ri emas"])("continues: %s", async (text) => {
+      const r = await reply(text);
+      expect(r.intent).toBe("none");
+      expect(r.state.stage).toBe("gathering");
+    }, 90000);
+
+    it.each(["Yangidan boshlash", "Boshidan boshlaymiz, hammasini o'chir"])("restarts: %s", async (text) => {
+      expect((await reply(text)).intent).toBe("restart");
+    }, 90000);
+
+    it.each(["Yo'q, 5-xona edi", "Ha, lekin xona 5 edi", "Ha, lekin bu kecha bo'lgan"])(
+      "is an update, never a submit: %s",
+      async (text) => {
+        const r = await reply(text);
+        expect(r.intent).toBe("none");
+        expect(r.state.stage).toBe("confirming");
+      },
+      90000
+    );
+  });
 });

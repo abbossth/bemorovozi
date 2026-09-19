@@ -342,7 +342,8 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
     if (stoppingRef.current) return;
     abortListening();
     setMicError(null);
-    setPhase("stuck");
+    // With the card on screen the buttons are still right there, so silence isn't a dead end.
+    setPhase(stageRef.current === "confirming" ? "idle" : "stuck");
   }
 
   async function handleRecordingStopped(chunks: Blob[], mimeType: string) {
@@ -417,8 +418,9 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
     await speak(text);
     // A newer message (or an interruption) took over while this one was playing.
     if (!activeRef.current || id !== playIdRef.current) return;
-    if (stageRef.current === "gathering" && !busyRef.current) startListening();
-    else setPhase("idle"); // card is showing: the patient answers with the buttons (or taps the orb to add more)
+    // Also while the card is showing: the patient can answer it aloud ("ha, yuboring") instead of tapping.
+    if (stageRef.current !== "done" && !busyRef.current) startListening();
+    else setPhase("idle");
   }
 
   function speak(text: string): Promise<void> {
@@ -514,10 +516,14 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
   };
   const hint: Record<Phase, string> = {
     connecting: "",
-    listening: noSpeechHint ? "Sizni eshitmayapman. Mikrofonga yaqinroq gapiring" : "Tugatish uchun bosing yoki jim turing",
+    listening: noSpeechHint
+      ? "Sizni eshitmayapman. Mikrofonga yaqinroq gapiring"
+      : stage === "confirming"
+      ? "«Ha», «yo'q» yoki «yangidan boshlash» deb ayting"
+      : "Tugatish uchun bosing yoki jim turing",
     thinking: "",
     speaking: "To'xtatib gapirish uchun bosing",
-    idle: stage === "confirming" ? "Tugmani tanlang yoki qo'shish uchun bosing" : "Gapirish uchun bosing",
+    idle: stage === "confirming" ? "Tugmani tanlang yoki gapirish uchun bosing" : "Gapirish uchun bosing",
     denied: "Yozib yuborishingiz mumkin",
     stuck: "Atrof shovqinli bo'lishi mumkin",
   };

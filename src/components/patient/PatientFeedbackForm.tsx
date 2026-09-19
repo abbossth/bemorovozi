@@ -44,7 +44,7 @@ export function PatientFeedbackForm({ departmentName, floorLabel, initialToken, 
 
   async function sendFromVoice(text: string) {
     usedVoiceRef.current = true;
-    return conv.send(text);
+    return conv.send(text, "voice");
   }
 
   if (conv.trackingCode) {
@@ -128,8 +128,8 @@ export function PatientFeedbackForm({ departmentName, floorLabel, initialToken, 
             {mode === "text" ? (
               <TextComposer
                 disabled={conv.busy}
-                placeholder={confirming ? "Yoki shu yerga qo'shimcha yozing..." : "Xabaringizni yozing..."}
-                onSend={conv.send}
+                placeholder={confirming ? "«Ha» deb yozing yoki qo'shimcha yozing..." : "Xabaringizni yozing..."}
+                onSend={(text) => conv.send(text, usedVoiceRef.current ? "voice" : "text")}
               />
             ) : (
               <VoiceControls

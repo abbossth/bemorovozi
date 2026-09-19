@@ -9,6 +9,7 @@ import {
   EngineError,
   greetingFor,
   handleMessage,
+  handleMessageWithIntent,
   markDone,
   matchDepartmentName,
   MAX_CLARIFICATIONS,
@@ -31,6 +32,7 @@ const base = (state: Partial<ModelOutput> = {}): ModelOutput => ({
   next_question_field: null,
   clarification_count: 0,
   route_to_management: false,
+  card_reply: "not_applicable",
   ...state,
 });
 
@@ -292,5 +294,78 @@ describe("matchDepartmentName", () => {
     expect(matchDepartmentName("Kardiologiya boʻlimi", names)).toBe("Kardiologiya bo'limi");
     expect(matchDepartmentName("Reanimatsiya", names)).toBeNull();
     expect(matchDepartmentName(null, names)).toBeNull();
+  });
+});
+
+describe("the card can be answered in words, like its buttons", () => {
+  async function withCard(...next: ModelOutput[]) {
+    const { fn } = scripted(base({ room_or_ward: "3-xona", department: "Kardiologiya bo'limi" }), ...next);
+    const shown = await handleMessage(fresh(), "Kardiologiya bo'limida 3-xonada hamshira kelmadi", fn);
+    expect(shown.stage).toBe("confirming");
+    return { shown, fn };
+  }
+
+  it("'ha, yuboring' confirms — like pressing 'Ha, to'g'ri — yubor' — without storing the yes", async () => {
+    const { shown, fn } = await withCard(base({ card_reply: "confirm", room_or_ward: "3-xona" }));
+    const result = await handleMessageWithIntent(shown, "Ha, hammasi to'g'ri, yuborsang bo'ladi.", fn);
+
+    expect(result.intent).toBe("confirm");
+    expect(result.state.stage).toBe("confirming"); // still confirmable: finalize gates on it
+    expect(assertCanConfirm(result.state).room).toBe("3-xona");
+    expect(patientTranscript(result.state)).toBe("Kardiologiya bo'limida 3-xonada hamshira kelmadi");
+    expect(storedConversation(result.state).map((m) => m.text)).not.toContain("Ha, hammasi to'g'ri, yuborsang bo'ladi.");
+  });
+
+  it("does not mistake a differently-worded but identical department for a change", async () => {
+    const { shown, fn } = await withCard(base({ card_reply: "confirm", department: "Kardiologiya", room_or_ward: "3-xona" }));
+    expect((await handleMessageWithIntent(shown, "ha yubor", fn)).intent).toBe("confirm");
+  });
+
+  it("'yo'q' works like 'Yo'q, davom etaman': back to listening, no new card yet", async () => {
+    const { shown, fn } = await withCard(base({ card_reply: "wants_to_continue" }));
+    const result = await handleMessageWithIntent(shown, "yo'q", fn);
+
+    expect(result.intent).toBe("none");
+    expect(result.state.stage).toBe("gathering");
+    expect(result.state.messages[result.state.messages.length - 1].text).toBe(CONTINUE_PROMPT);
+    expect(patientTranscript(result.state)).not.toContain("yo'q");
+  });
+
+  it("'yangidan boshlash' asks the route to restart", async () => {
+    const { shown, fn } = await withCard(base({ card_reply: "restart" }));
+    expect((await handleMessageWithIntent(shown, "boshidan boshlaymiz", fn)).intent).toBe("restart");
+  });
+
+  it("a correction is an update, not a confirmation, even if the model says 'confirm'", async () => {
+    // model claims "confirm" but changed the room → the server refuses to submit
+    const { shown, fn } = await withCard(base({ card_reply: "confirm", room_or_ward: "5-xona", short_summary: "Yangilandi." }));
+    const result = await handleMessageWithIntent(shown, "ha, lekin 5-xona edi", fn);
+
+    expect(result.intent).toBe("none");
+    expect(result.state.stage).toBe("confirming");
+    expect(result.state.card?.room).toBe("5-xona");
+    expect(result.state.messages.filter((m) => m.card)).toHaveLength(2);
+  });
+
+  it("a long reply is never treated as a bare 'yes'", async () => {
+    const long = "ha to'g'ri lekin shuni ham qo'shing ki hamshira ikki marta chaqirilganda ham kelmadi va shifokor ham yo'q edi";
+    const { shown, fn } = await withCard(base({ card_reply: "confirm", room_or_ward: "3-xona" }));
+    const result = await handleMessageWithIntent(shown, long, fn);
+    expect(result.intent).toBe("none");
+    expect(patientTranscript(result.state)).toContain("ikki marta");
+  });
+
+  it("'confirm' is ignored unless the card was actually showing", async () => {
+    const { fn } = scripted({ ...question("room"), card_reply: "confirm" });
+    const result = await handleMessageWithIntent(fresh(), "ha", fn);
+    expect(result.intent).toBe("none");
+    expect(result.state.stage).toBe("gathering");
+  });
+
+  it("an off-topic reply while the card is showing is never a confirmation", async () => {
+    const { shown, fn } = await withCard(base({ on_topic: false, card_reply: "confirm", assistant_reply_text: "" }));
+    const result = await handleMessageWithIntent(shown, "kim yutdi futbolda?", fn);
+    expect(result.intent).toBe("none");
+    expect(result.state.stage).toBe("confirming");
   });
 });

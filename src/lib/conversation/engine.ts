@@ -12,6 +12,13 @@
 
 import type { Card, ChatMessage, ConversationState, ConversationView, ModelFn, ModelOutput } from "./types";
 
+/** What a message did beyond adding to the chat: the patient may answer the card by voice/text instead of the buttons. */
+export type MessageIntent = "none" | "confirm" | "restart";
+export type MessageResult = { state: ConversationState; intent: MessageIntent };
+
+/** A longer reply is never treated as a bare "yes": it probably carries a correction. */
+const MAX_CONFIRM_WORDS = 12;
+
 export const MAX_CLARIFICATIONS = 3;
 export const MAX_MESSAGES = 40;
 export const MAX_TEXT_LENGTH = 1500;
@@ -90,12 +97,12 @@ export function matchDepartmentName(raw: string | null, names: string[]): string
 }
 
 function patientTexts(messages: ChatMessage[]) {
-  return messages.filter((m) => m.role === "patient" && !m.offTopic).map((m) => m.text);
+  return messages.filter((m) => m.role === "patient" && !m.transient).map((m) => m.text);
 }
 
 /** The conversation as it is stored: everything except off-topic chatter. */
 export function storedConversation(state: ConversationState) {
-  return state.messages.filter((m) => !m.offTopic).map(({ role, text }) => ({ role, text }));
+  return state.messages.filter((m) => !m.transient).map(({ role, text }) => ({ role, text }));
 }
 
 export function patientTranscript(state: ConversationState) {
@@ -117,6 +124,7 @@ function fallbackOutput(state: ConversationState): ModelOutput {
     next_question_field: null,
     clarification_count: state.clarificationCount,
     route_to_management: state.card?.routeToManagement ?? false,
+    card_reply: "provides_info",
   };
 }
 
@@ -143,9 +151,9 @@ function applyModelOutput(
     const reply: ChatMessage = {
       role: "assistant",
       text: out.assistant_reply_text.trim() || OFF_TOPIC_REPLY,
-      offTopic: true,
+      transient: true,
     };
-    const messages = state.messages.map((m, i) => (i === state.messages.length - 1 ? { ...m, offTopic: true } : m));
+    const messages = state.messages.map((m, i) => (i === state.messages.length - 1 ? { ...m, transient: true } : m));
     return { ...state, stage: previousStage, messages: [...messages, reply] };
   }
 
@@ -187,7 +195,42 @@ function applyModelOutput(
 export const OFF_TOPIC_REPLY =
   "Kechirasiz, men bu masalada yordam bera olmayman. Men faqat shifoxona xizmati bo'yicha shikoyat va takliflarni qabul qilaman.";
 
-export async function handleMessage(state: ConversationState, rawText: string, model: ModelFn): Promise<ConversationState> {
+const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+
+function sameValue(a: string, b: string) {
+  const x = normalizeName(a);
+  const y = normalizeName(b);
+  return x === y || x.includes(y) || y.includes(x);
+}
+
+/** Did the model, while "confirming", actually change something on the card? */
+function changesCard(card: Card, out: ModelOutput) {
+  const differs = (next: string | null, current: string | null) => next !== null && (current === null || !sameValue(next, current));
+  return (
+    (out.type !== null && out.type !== card.type) ||
+    differs(cleanField(out.department), card.department) ||
+    differs(cleanField(out.room_or_ward), card.room) ||
+    differs(cleanField(out.staff_name), card.staff) ||
+    differs(cleanField(out.when), card.when)
+  );
+}
+
+/**
+ * The confirmation card offers three buttons; the patient may just as well SAY or TYPE them
+ * ("ha, hammasi to'g'ri, yuboring" / "yo'q" / "boshidan boshlaymiz"). The model classifies the reply, the
+ * server decides — and is deliberately strict about "confirm", because that submits: it must be a short,
+ * bare agreement that changes nothing on the card. Anything else is treated as an update.
+ */
+function readCardReply(state: ConversationState, out: ModelOutput, text: string): "confirm" | "continue" | "restart" | "update" {
+  if (out.card_reply === "restart") return "restart";
+  if (out.card_reply === "wants_to_continue") return "continue";
+  if (out.card_reply === "confirm" && state.card && wordCount(text) <= MAX_CONFIRM_WORDS && !changesCard(state.card, out)) {
+    return "confirm";
+  }
+  return "update";
+}
+
+export async function handleMessageWithIntent(state: ConversationState, rawText: string, model: ModelFn): Promise<MessageResult> {
   if (state.stage === "done") throw new EngineError("wrong_stage", "Suhbat yakunlangan.");
 
   const text = rawText.trim();
@@ -198,6 +241,7 @@ export async function handleMessage(state: ConversationState, rawText: string, m
   }
 
   const previousStage = state.stage;
+  const cardShowing = previousStage === "confirming" && state.card !== null;
   const base: ConversationState = {
     ...state,
     stage: "gathering",
@@ -210,6 +254,7 @@ export async function handleMessage(state: ConversationState, rawText: string, m
   try {
     out = await model({
       state: base,
+      cardShowing,
       asked: base.clarificationCount,
       remaining: Math.max(0, MAX_CLARIFICATIONS - base.clarificationCount),
     });
@@ -218,7 +263,26 @@ export async function handleMessage(state: ConversationState, rawText: string, m
     out = fallbackOutput(base);
   }
 
-  return applyModelOutput(base, out, previousStage);
+  if (cardShowing && out.on_topic) {
+    // The reply is a button press in words. It stays visible in the chat but is never stored.
+    const spoken: ChatMessage = { role: "patient", text, transient: true };
+    switch (readCardReply(state, out, text)) {
+      case "confirm":
+        return { state: { ...state, messages: [...state.messages, spoken] }, intent: "confirm" };
+      case "restart":
+        return { state: { ...state, messages: [...state.messages, spoken] }, intent: "restart" };
+      case "continue":
+        return { state: continueConversation({ ...state, messages: [...state.messages, spoken] }), intent: "none" };
+      case "update":
+        break;
+    }
+  }
+
+  return { state: applyModelOutput(base, out, previousStage), intent: "none" };
+}
+
+export async function handleMessage(state: ConversationState, rawText: string, model: ModelFn): Promise<ConversationState> {
+  return (await handleMessageWithIntent(state, rawText, model)).state;
 }
 
 /** "Yo'q, davom etaman": back to listening; the next message goes straight to an updated card. */
