@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { VoiceOrb, type OrbPhase, type VoiceOrbHandle } from "@/components/patient/VoiceOrb";
+import { SpeechDetector, rmsToDb } from "@/lib/voice/vad";
+import { createMicMeter, sampleAmbientDb, type MicMeter } from "@/lib/voice/micMeter";
 
 type VoiceTurn = { role: "ai" | "patient"; text: string };
 
 type CallState = "connecting" | "listening" | "thinking" | "speaking" | "confirm" | "denied" | "stuck";
 
 const MAX_CONSECUTIVE_ERRORS = 3;
+// Recordings whose transcript has no words (pure noise) before we give up and offer text instead.
+const MAX_EMPTY_TRANSCRIPTS = 3;
 
 type Props = {
   departmentName: string;
@@ -24,12 +28,16 @@ const INITIAL_VOICE_TURN: VoiceTurn = {
   text: "Salom! Nima haqida gapirmoqchisiz?",
 };
 
-// Below this RMS amplitude (0..1) the mic input counts as "silence" for
-// auto-stop purposes. Tuned empirically for typical phone-mic room noise.
-const SILENCE_RMS_THRESHOLD = 0.02;
-const SILENCE_DURATION_MS = 1400;
-const MIN_RECORDING_MS = 600;
-const MAX_RECORDING_MS = 25000;
+// Speech vs. background noise is decided by SpeechDetector (adaptive noise floor,
+// see src/lib/voice/vad.ts) — not by a fixed loudness threshold, which in a noisy
+// room never let the turn end and in a quiet one cut the patient off.
+const CALIBRATION_MS = 500;
+const MAX_UTTERANCE_MS = 25000;
+// While nobody has spoken yet, keep only this much recent audio so long stretches
+// of room noise are never uploaded to STT along with the actual answer.
+const PREROLL_MS = 1500;
+const NO_SPEECH_HINT_MS = 7000;
+const NO_SPEECH_GIVEUP_MS = 30000;
 
 function getAudioContextCtor(): typeof AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -41,6 +49,8 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
   const [callState, setCallState] = useState<CallState>("connecting");
   const [voiceTurns, setVoiceTurns] = useState<VoiceTurn[]>([INITIAL_VOICE_TURN]);
   const [micError, setMicError] = useState<string | null>(null);
+  const [noSpeechHint, setNoSpeechHint] = useState(false);
+  const [vadDebug, setVadDebug] = useState<string | null>(null);
 
   const activeRef = useRef(true);
   const orbApiRef = useRef<VoiceOrbHandle | null>(null);
@@ -48,12 +58,12 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const micAnalyserRef = useRef<AnalyserNode | null>(null);
+  const micMeterRef = useRef<MicMeter | null>(null);
+  const detectorRef = useRef<SpeechDetector | null>(null);
+  const emptyTranscriptsRef = useRef(0);
   const ttsAnalyserRef = useRef<AnalyserNode | null>(null);
   const ttsSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const rafRef = useRef<number | null>(null);
-  const lastLoudAtRef = useRef(0);
-  const recordingStartRef = useRef(0);
   const stoppingRef = useRef(false);
   const consecutiveErrorsRef = useRef(0);
 
@@ -77,6 +87,8 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
         /* already stopped */
       }
     }
+    micMeterRef.current?.disconnect();
+    micMeterRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     audioElRef.current?.pause();
@@ -95,7 +107,9 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
 
   async function startCall() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       if (!activeRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
@@ -107,12 +121,34 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
       return;
     }
 
+    await calibrateNoiseFloor();
+    if (!activeRef.current) return;
+
     await speak(INITIAL_VOICE_TURN.text);
     if (!activeRef.current) return;
     startListening();
   }
 
-  function meterLoop(analyser: AnalyserNode, onLevel: (rms: number) => void, onTick?: () => void) {
+  // Listens to the room for a moment before the assistant speaks, so the detector
+  // starts out knowing how noisy this particular place is.
+  async function calibrateNoiseFloor() {
+    const stream = streamRef.current;
+    const ctx = ensureAudioContext();
+    if (!stream || !ctx) return;
+    try {
+      if (ctx.state === "suspended") await ctx.resume();
+      const meter = createMicMeter(ctx, stream);
+      const samples = await sampleAmbientDb(meter, CALIBRATION_MS, () => !activeRef.current);
+      meter.disconnect();
+      if (!detectorRef.current) detectorRef.current = new SpeechDetector();
+      detectorRef.current.calibrate(samples);
+    } catch {
+      /* detector keeps its default floor and adapts on its own */
+    }
+  }
+
+  // Drives the orb from the assistant's own voice while it speaks (mic input uses micLoop).
+  function meterLoop(analyser: AnalyserNode, onLevel: (rms: number) => void) {
     const data = new Uint8Array(analyser.frequencyBinCount);
     const tick = () => {
       if (!activeRef.current) return;
@@ -124,7 +160,6 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
       }
       const rms = Math.sqrt(sum / data.length);
       onLevel(rms);
-      onTick?.();
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -134,52 +169,149 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
     orbApiRef.current?.setLevel(rms);
   }
 
-  function startListening() {
-    const stream = streamRef.current;
-    if (!stream || !activeRef.current) return;
-    stoppingRef.current = false;
-    setCallState("listening");
-
-    const ctx = ensureAudioContext();
-    if (ctx) {
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      source.connect(analyser);
-      micAnalyserRef.current = analyser;
-      lastLoudAtRef.current = performance.now();
-      recordingStartRef.current = performance.now();
-      meterLoop(analyser, (rms) => {
-        applyOrbScale(rms);
-        const now = performance.now();
-        if (rms > SILENCE_RMS_THRESHOLD) lastLoudAtRef.current = now;
-        const elapsed = now - recordingStartRef.current;
-        if (elapsed > MIN_RECORDING_MS && now - lastLoudAtRef.current > SILENCE_DURATION_MS) {
-          stopListening();
-        } else if (elapsed > MAX_RECORDING_MS) {
-          stopListening();
-        }
-      });
-    }
-
+  function beginRecorder(stream: MediaStream) {
     const recorder = new MediaRecorder(stream);
     const chunks: Blob[] = [];
     chunksRef.current = chunks;
-    recorder.ondataavailable = (e) => chunks.push(e.data);
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
     recorder.onstop = () => handleRecordingStopped(chunks);
     recorderRef.current = recorder;
     recorder.start();
   }
 
-  function stopListening() {
-    if (stoppingRef.current) return;
-    stoppingRef.current = true;
+  // Throws away everything recorded so far (room noise before the patient spoke)
+  // and starts a fresh recording, without triggering the "recording finished" flow.
+  function rollRecorder(stream: MediaStream) {
+    const old = recorderRef.current;
+    if (old && old.state !== "inactive") {
+      old.onstop = null;
+      old.ondataavailable = null;
+      try {
+        old.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    beginRecorder(stream);
+  }
+
+  function micLoop(meter: MicMeter, onFrame: (rms: number, db: number) => void) {
+    const tick = () => {
+      if (!activeRef.current || stoppingRef.current) return;
+      const rms = meter.readRms();
+      onFrame(rms, rmsToDb(rms));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  function startListening() {
+    const stream = streamRef.current;
+    if (!stream || !activeRef.current) return;
+    stoppingRef.current = false;
+    setNoSpeechHint(false);
+    setCallState("listening");
+
+    beginRecorder(stream);
+
+    const ctx = ensureAudioContext();
+    if (!ctx) return; // no Web Audio: the patient ends the turn by tapping the orb
+
+    const detector = detectorRef.current ?? (detectorRef.current = new SpeechDetector());
+    detector.reset();
+    micMeterRef.current?.disconnect();
+    const meter = createMicMeter(ctx, stream);
+    micMeterRef.current = meter;
+
+    const debug = new URLSearchParams(window.location.search).has("vadDebug");
+    const listenStart = performance.now();
+    let lastRoll = listenStart;
+    let speechStartedAt = 0;
+    let hintShown = false;
+    let lastDebugAt = 0;
+
+    micLoop(meter, (rms, db) => {
+      const now = performance.now();
+      const frame = detector.update(db, now);
+      // Only speech moves the orb — background noise no longer makes it react.
+      applyOrbScale(frame.voiced ? rms : 0);
+
+      if (debug && now - lastDebugAt > 150) {
+        lastDebugAt = now;
+        setVadDebug(
+          `db ${db.toFixed(0)} · shovqin ${frame.noiseFloorDb.toFixed(0)} · ${frame.speaking ? "GAP" : frame.voiced ? "gap?" : "-"}`
+        );
+      }
+
+      if (frame.event === "speech_start") {
+        speechStartedAt = now;
+        if (hintShown) {
+          hintShown = false;
+          setNoSpeechHint(false);
+        }
+      } else if (frame.event === "noise_burst" || frame.event === "noise_cancel") {
+        speechStartedAt = 0;
+      } else if (frame.event === "speech_end") {
+        stopListening();
+        return;
+      }
+
+      if (speechStartedAt) {
+        if (now - speechStartedAt > MAX_UTTERANCE_MS) stopListening();
+        return;
+      }
+
+      // Nobody speaking yet: never end the turn on silence, just don't hoard noise.
+      if (!detector.pending && now - lastRoll > PREROLL_MS) {
+        rollRecorder(stream);
+        lastRoll = now;
+      }
+      const waited = now - listenStart;
+      if (!hintShown && waited > NO_SPEECH_HINT_MS) {
+        hintShown = true;
+        setNoSpeechHint(true);
+      }
+      if (waited > NO_SPEECH_GIVEUP_MS) giveUpListening();
+    });
+  }
+
+  function endMeter() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
     applyOrbScale(0);
+    micMeterRef.current?.disconnect();
+    micMeterRef.current = null;
+    setVadDebug(null);
+  }
+
+  function stopListening() {
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    endMeter();
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
+  }
+
+  // Nobody spoke for a long time: drop the recording and offer retry / typing instead of hanging.
+  function giveUpListening() {
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    endMeter();
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      try {
+        recorder.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    setMicError(null);
+    setCallState("stuck");
   }
 
   async function handleRecordingStopped(chunks: Blob[]) {
@@ -194,7 +326,21 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
       if (!sttRes.ok) throw new Error(sttData.error ?? "Ovozni tanib bo'lmadi");
       if (!activeRef.current) return;
 
-      const nextHistory: VoiceTurn[] = [...voiceTurns, { role: "patient", text: sttData.text }];
+      // Noise that slipped through comes back as an empty (or wordless) transcript —
+      // don't feed that to the assistant as if the patient had said something.
+      const heard = String(sttData.text ?? "").trim();
+      if (!/\p{L}/u.test(heard)) {
+        emptyTranscriptsRef.current += 1;
+        if (emptyTranscriptsRef.current >= MAX_EMPTY_TRANSCRIPTS) {
+          setCallState("stuck");
+        } else {
+          startListening();
+        }
+        return;
+      }
+      emptyTranscriptsRef.current = 0;
+
+      const nextHistory: VoiceTurn[] = [...voiceTurns, { role: "patient", text: heard }];
       setVoiceTurns(nextHistory);
 
       const turnRes = await fetch("/api/voice/turn", {
@@ -312,6 +458,7 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
 
   function handleRetry() {
     consecutiveErrorsRef.current = 0;
+    emptyTranscriptsRef.current = 0;
     setMicError(null);
     startListening();
   }
@@ -406,17 +553,23 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
             ) : (
               <span className="text-xs text-gray-500">
                 {callState === "listening"
-                  ? "Tugatish uchun bosing yoki jim turing"
+                  ? noSpeechHint
+                    ? "Sizni eshitmayapman. Mikrofonga yaqinroq gapiring"
+                    : "Tugatish uchun bosing yoki jim turing"
                   : callState === "speaking"
                   ? "To'xtatib gapirish uchun bosing"
                   : callState === "denied"
                   ? "Sahifani yangilab qayta urinib ko'ring"
                   : callState === "stuck"
-                  ? "Ovozingiz bir necha marta aniqlanmadi"
+                  ? "Ovozingiz aniqlanmadi. Atrof shovqinli bo'lishi mumkin"
                   : ""}
               </span>
             )}
           </div>
+
+          {vadDebug && callState === "listening" && (
+            <span className="font-mono text-[11px] text-gray-400">{vadDebug}</span>
+          )}
 
           {callState === "stuck" && (
             <div className="flex w-full max-w-[260px] flex-col gap-2.5">
