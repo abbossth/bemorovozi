@@ -8,6 +8,8 @@ import { humanizeTag } from "@/lib/ui/format";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_ITEMS = 500;
+/** New-report alerts are computed from these, whatever date/department filter the list is showing. */
+const LATEST_COUNT = 20;
 const WEEKDAYS = ["Yak", "Dush", "Sesh", "Chor", "Pay", "Jum", "Shan"];
 
 /** Midnight of `date`'s day in a timezone `offsetMinutes` east of UTC, as a real instant. */
@@ -28,7 +30,8 @@ export async function GET(request: Request) {
   if (!staff) return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 401 });
 
   // "Today" and the daily buckets must follow the viewer's clock, not the server's (UTC on Vercel).
-  const tzParam = Number(new URL(request.url).searchParams.get("tz"));
+  const params = new URL(request.url).searchParams;
+  const tzParam = Number(params.get("tz"));
   const tz = Number.isFinite(tzParam) ? Math.max(-720, Math.min(840, Math.round(tzParam))) : 300;
 
   await connectDB();
@@ -39,8 +42,19 @@ export async function GET(request: Request) {
   const clusterStart = new Date(now.getTime() - CLUSTER_WINDOW_DAYS * DAY_MS);
   const hospitalId = staff.hospitalId;
 
-  const [items, departments, todayCount, highCount, resolvedAvg, perDay, clusterRows] = await Promise.all([
-    Feedback.find({ hospitalId }).sort({ createdAt: -1 }).limit(MAX_ITEMS).lean(),
+  // Optional date range for the list (ISO instants; the browser computes "Bugun/Bu hafta/Bu oy/Maxsus").
+  const parseDate = (value: string | null) => {
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
+  };
+  const from = parseDate(params.get("from"));
+  const to = parseDate(params.get("to"));
+  const listFilter: Record<string, unknown> = { hospitalId };
+  if (from || to) listFilter.createdAt = { ...(from && { $gte: from }), ...(to && { $lte: to }) };
+
+  const [items, latestItems, departments, todayCount, highCount, resolvedAvg, perDay, clusterRows] = await Promise.all([
+    Feedback.find(listFilter).sort({ createdAt: -1 }).limit(MAX_ITEMS).lean(),
+    Feedback.find({ hospitalId }).sort({ createdAt: -1 }).limit(LATEST_COUNT).lean(),
     Department.find({ hospitalId }).lean(),
     Feedback.countDocuments({ hospitalId, createdAt: { $gte: todayStart } }),
     Feedback.countDocuments({ hospitalId, severity: "yuqori", status: { $ne: "hal_qilindi" } }),
@@ -75,31 +89,37 @@ export async function GET(request: Request) {
 
   const avgMs = resolvedAvg[0]?.avgMs as number | undefined;
 
+  const toItem = (item: (typeof items)[number]) => {
+    const cluster = clusterOf.get(String(item._id));
+    return {
+      id: String(item._id),
+      excerpt: item.transcript,
+      summary: item.aiSummary,
+      dept: deptNameById.get(String(item.departmentId)) ?? "Noma'lum bo'lim",
+      severity: item.severity,
+      status: item.status,
+      channel: item.channel,
+      trackingCode: item.trackingCode,
+      createdAt: item.createdAt,
+      kind: item.kind ?? "shikoyat",
+      room: item.roomOrWard ?? null,
+      staffName: item.staffName ?? null,
+      occurredAt: item.occurredAt ?? null,
+      routedToManagement: item.routedToManagement ?? false,
+      reviewedByName: item.reviewedByName ?? null,
+      resolvedByName: item.resolvedByName ?? null,
+      conversation: item.conversation ?? null,
+      isSystemic: Boolean(cluster),
+      clusterCount: cluster?.count ?? 1,
+    };
+  };
+
+
   return NextResponse.json({
-    items: items.map((item) => {
-      const cluster = clusterOf.get(String(item._id));
-      return {
-        id: String(item._id),
-        excerpt: item.transcript,
-        summary: item.aiSummary,
-        dept: deptNameById.get(String(item.departmentId)) ?? "Noma'lum bo'lim",
-        severity: item.severity,
-        status: item.status,
-        channel: item.channel,
-        trackingCode: item.trackingCode,
-        createdAt: item.createdAt,
-        kind: item.kind ?? "shikoyat",
-        room: item.roomOrWard ?? null,
-        staffName: item.staffName ?? null,
-        occurredAt: item.occurredAt ?? null,
-        routedToManagement: item.routedToManagement ?? false,
-        reviewedByName: item.reviewedByName ?? null,
-        resolvedByName: item.resolvedByName ?? null,
-        conversation: item.conversation ?? null,
-        isSystemic: Boolean(cluster),
-        clusterCount: cluster?.count ?? 1,
-      };
-    }),
+    items: items.map(toItem),
+    truncated: items.length >= MAX_ITEMS,
+    latest: latestItems.map(toItem),
+    departments: departments.map((d) => d.name).sort((x, y) => x.localeCompare(y, "uz")),
     stats: {
       todayCount,
       highCount,

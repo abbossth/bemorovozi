@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import { formatDateTime } from "@/lib/ui/format";
 
 type Lead = {
   id: string;
@@ -49,7 +50,7 @@ const FILTERS: { value: "all" | Lead["status"]; label: string }[] = [
 ];
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleString("uz-UZ", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return formatDateTime(new Date(iso));
 }
 
 export function LeadsDashboard() {

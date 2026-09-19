@@ -12,7 +12,8 @@ import { buildFeedbackPayload } from "@/lib/push/payload";
 import { Tag } from "@/components/Tag";
 import { Avatar } from "@/components/Avatar";
 import { OverviewPanel, type Overview } from "@/components/dashboard/OverviewPanel";
-import { shortName } from "@/lib/ui/format";
+import { FilterBar, SearchBox, type RangeKey } from "@/components/dashboard/FilterBar";
+import { formatClock, formatDayMonth, formatDateTime, shortName } from "@/lib/ui/format";
 import { CLUSTER_WINDOW_DAYS } from "@/lib/clusters";
 import { IDLE, SELECTED, TONE } from "@/lib/ui/tones";
 import { playSeverityAlert } from "@/lib/notificationSound";
@@ -43,6 +44,11 @@ type FeedbackItem = {
 
 type DashboardResponse = {
   items: FeedbackItem[];
+  /** the list hit the server's size cap */
+  truncated: boolean;
+  /** newest reports regardless of filters — new-report alerts are computed from these */
+  latest: FeedbackItem[];
+  departments: string[];
   stats: { todayCount: number; highCount: number; avgResponseMinutes: number | null };
   overview: Overview;
 };
@@ -57,18 +63,43 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
-// Day buckets and "today" follow this browser's clock (minutes east of UTC), not the server's.
-const TZ_QUERY = () => `?tz=${-new Date().getTimezoneOffset()}`;
+/** Local-clock date bounds for a range chip ("Bu hafta" starts on Monday). */
+function rangeBounds(range: RangeKey, customFrom: string, customTo: string): { from?: Date; to?: Date } {
+  const now = new Date();
+  const day = (offset = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset);
+  if (range === "today") return { from: day() };
+  if (range === "week") return { from: day((now.getDay() + 6) % 7) };
+  if (range === "month") return { from: new Date(now.getFullYear(), now.getMonth(), 1) };
+  if (range === "custom") {
+    return {
+      from: customFrom ? new Date(`${customFrom}T00:00:00`) : undefined,
+      to: customTo ? new Date(`${customTo}T23:59:59.999`) : undefined,
+    };
+  }
+  return {};
+}
 
-const FILTERS: { value: "all" | Severity; label: string }[] = [
-  { value: "all", label: "Hammasi" },
-  { value: "yuqori", label: "Yuqori" },
-  { value: "orta", label: "O'rta" },
-  { value: "past", label: "Past" },
-];
+/** Day buckets and "today" follow this browser's clock (minutes east of UTC), not the server's. */
+function buildQuery(bounds: { from?: Date; to?: Date }) {
+  const params = new URLSearchParams({ tz: String(-new Date().getTimezoneOffset()) });
+  if (bounds.from) params.set("from", bounds.from.toISOString());
+  if (bounds.to) params.set("to", bounds.to.toISOString());
+  return `?${params}`;
+}
+
+const normalize = (text: string) => text.toLowerCase().replace(/[’`ʻʼ‘]/g, "'");
+
+function matchesQuery(item: FeedbackItem, query: string) {
+  const q = normalize(query.trim());
+  if (!q) return true;
+  const haystack = normalize(
+    [item.summary, item.excerpt, item.dept, item.trackingCode, item.room, item.staffName, item.occurredAt].filter(Boolean).join(" ")
+  );
+  return haystack.includes(q);
+}
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+  return formatClock(new Date(iso));
 }
 
 /** "14:25" for today, "Kecha 14:25" for yesterday, "12-sen 14:25" otherwise — the list can now span weeks. */
@@ -79,17 +110,30 @@ function formatWhen(iso: string) {
   const time = formatTime(iso);
   if (days <= 0) return time;
   if (days === 1) return `Kecha ${time}`;
-  return `${date.toLocaleDateString("uz-UZ", { day: "numeric", month: "short" })} ${time}`;
+  return formatDateTime(date);
 }
 
 export function FeedbackDashboard() {
-  const { data, mutate } = useSWR<DashboardResponse>(`/api/dashboard/feedback${TZ_QUERY()}`, fetcher, {
-    refreshInterval: 15000,
-    // Keep polling while the tab is in the background — that is exactly when a notification is wanted.
-    refreshWhenHidden: true,
-    revalidateOnFocus: true,
-  });
+  const [range, setRange] = useState<RangeKey>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [filter, setFilter] = useState<"all" | Severity>("all");
+  const [department, setDepartment] = useState("all");
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const { data, mutate } = useSWR<DashboardResponse>(
+    `/api/dashboard/feedback${buildQuery(rangeBounds(range, customFrom, customTo))}`,
+    fetcher,
+    {
+      refreshInterval: 15000,
+      // Keep polling while the tab is in the background — that is exactly when a notification is wanted.
+      refreshWhenHidden: true,
+      revalidateOnFocus: true,
+      // Switching the date range keeps the old list on screen until the new one arrives.
+      keepPreviousData: true,
+    }
+  );
   // A clicked push notification opens /dashboard?feedback=<id> — start with that item selected.
   // (The list is fetched client-side, so nothing about it is in the server HTML to mismatch.)
   const [selectedId, setSelectedId] = useState<string | null>(() =>
@@ -98,27 +142,38 @@ export function FeedbackDashboard() {
   const [advancing, setAdvancing] = useState(false);
 
   const items = useMemo(() => data?.items ?? [], [data]);
+  // Severity + department + search narrow the list together (the date range is applied by the server).
   const filtered = useMemo(
-    () => (filter === "all" ? items : items.filter((i) => i.severity === filter)),
-    [items, filter]
+    () =>
+      items.filter(
+        (i) =>
+          (filter === "all" || i.severity === filter) &&
+          (department === "all" || i.dept === department) &&
+          matchesQuery(i, query)
+      ),
+    [items, filter, department, query]
   );
-  const selected = items.find((i) => i.id === selectedId) ?? null;
+  const filtersActive = filter !== "all" || department !== "all" || query.trim() !== "" || range !== "all";
+  const selected = items.find((i) => i.id === selectedId) ?? data?.latest.find((i) => i.id === selectedId) ?? null;
   const byDepartment = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of filtered) counts.set(item.dept, (counts.get(item.dept) ?? 0) + 1);
     return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [filtered]);
-  const today = new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long" });
+  const today = formatDayMonth(new Date());
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const knownIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     if (!data) return;
-    const currentIds = new Set(items.map((i) => i.id));
+    // Alerts come from the newest reports as a whole — never from the filtered list — so changing the
+    // date range or a filter can neither raise false alerts nor hide a real one.
+    const live = data.latest ?? data.items;
+    const currentIds = new Set(live.map((i) => i.id));
 
     if (knownIdsRef.current) {
-      const newItems = items.filter((i) => !knownIdsRef.current!.has(i.id));
+      const newItems = live.filter((i) => !knownIdsRef.current!.has(i.id));
       if (newItems.length > 0) {
         const newToasts = newItems.map((i) => ({
           key: `${i.id}-${Date.now()}`,
@@ -159,7 +214,7 @@ export function FeedbackDashboard() {
     }
     // First load just establishes the baseline — no toasts/sound for pre-existing items.
     knownIdsRef.current = currentIds;
-  }, [data, items]);
+  }, [data]);
 
   function dismissToast(key: string) {
     setToasts((prev) => prev.filter((t) => t.key !== key));
@@ -184,11 +239,14 @@ export function FeedbackDashboard() {
   return (
     <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 sm:py-6 lg:h-screen lg:gap-5 lg:overflow-hidden lg:px-12 lg:py-8">
       <NewFeedbackToasts toasts={toasts} onDismiss={dismissToast} onSelect={setSelectedId} />
-      <div className="flex-shrink-0">
-        <h1 className="font-heading text-2xl font-extrabold text-ink lg:text-[28px]">Xabarlar</h1>
-        <p className="mt-1 text-sm text-gray-500" suppressHydrationWarning>
-          Bugun, {today}
-        </p>
+      <div className="flex flex-shrink-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-extrabold text-ink lg:text-[28px]">Xabarlar</h1>
+          <p className="mt-1 text-sm text-gray-500" suppressHydrationWarning>
+            Bugun, {today}
+          </p>
+        </div>
+        <SearchBox ref={searchRef} value={query} onChange={setQuery} />
       </div>
 
       <PushNotificationBanner />
@@ -202,31 +260,54 @@ export function FeedbackDashboard() {
         />
       </div>
 
-      <div className="-mx-4 flex flex-shrink-0 gap-2.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        {FILTERS.map((f) => {
-          const active = filter === f.value;
-          return (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setFilter(f.value)}
-              className="flex-shrink-0 rounded-full border-[1.5px] px-[18px] py-2 text-sm font-semibold"
-              style={{
-                borderColor: (active ? SELECTED : IDLE).border,
-                background: (active ? SELECTED : IDLE).bg,
-                color: (active ? SELECTED : IDLE).fg,
-              }}
-            >
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
+      <FilterBar
+        severity={filter}
+        onSeverity={setFilter}
+        department={department}
+        onDepartment={setDepartment}
+        departments={data?.departments ?? []}
+        range={range}
+        onRange={setRange}
+        customFrom={customFrom}
+        customTo={customTo}
+        onCustomFrom={setCustomFrom}
+        onCustomTo={setCustomTo}
+      />
 
       <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
         <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1">
+          {data && (
+            <div className="flex flex-shrink-0 items-center justify-between gap-3 px-1 text-[13px] text-gray-500" aria-live="polite">
+              <span data-testid="result-count">
+                {filtersActive ? (
+                  <>
+                    <b className="text-ink">{filtered.length}</b> / {items.length} ta xabar
+                  </>
+                ) : (
+                  <>{items.length} ta xabar</>
+                )}
+                {data.truncated && " · oxirgi 500 tasi"}
+              </span>
+              {filtersActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter("all");
+                    setDepartment("all");
+                    setQuery("");
+                    setRange("all");
+                  }}
+                  className="font-bold text-teal"
+                >
+                  Filtrlarni tozalash
+                </button>
+              )}
+            </div>
+          )}
           {filtered.length === 0 && (
-            <p className="mt-10 text-center text-sm text-gray-500">Hozircha xabarlar yo&apos;q.</p>
+            <p className="mt-10 text-center text-sm text-gray-500">
+              {filtersActive ? "Filtrga mos xabar topilmadi." : "Hozircha xabarlar yo'q."}
+            </p>
           )}
           {filtered.map((item) => {
             const active = item.id === selectedId;
