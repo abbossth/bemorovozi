@@ -13,6 +13,7 @@ import { SystemicTag, Tag } from "@/components/Tag";
 import { Avatar } from "@/components/Avatar";
 import { OverviewPanel, type Overview } from "@/components/dashboard/OverviewPanel";
 import { FilterBar, SearchBox, type RangeKey } from "@/components/dashboard/FilterBar";
+import { ShortcutsHelp } from "@/components/dashboard/ShortcutsHelp";
 import { formatClock, formatDayMonth, formatDateTime, shortName } from "@/lib/ui/format";
 import { CLUSTER_WINDOW_DAYS } from "@/lib/clusters";
 import { IDLE, SELECTED, TONE } from "@/lib/ui/tones";
@@ -121,6 +122,8 @@ export function FeedbackDashboard() {
   const [department, setDepartment] = useState("all");
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const { data, mutate } = useSWR<DashboardResponse>(
     `/api/dashboard/feedback${buildQuery(rangeBounds(range, customFrom, customTo))}`,
@@ -238,6 +241,55 @@ export function FeedbackDashboard() {
     knownIdsRef.current = currentIds;
   }, [data]);
 
+  // Keyboard: ↑/↓ move focus through the reports, Enter opens the focused one (a card is a button, so
+  // Enter is its native click), Esc closes the open report, "/" jumps to search, "?" shows this help.
+  // Nothing fires while typing in a field or with a modifier held.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const typing = !!target?.closest("input, textarea, select, [contenteditable='true']");
+      const cards = () => [...(listRef.current?.querySelectorAll<HTMLElement>("[data-card]") ?? [])];
+      const focusCard = (card: HTMLElement | undefined) => {
+        if (!card) return;
+        card.focus();
+        card.scrollIntoView({ block: "nearest" });
+      };
+
+      if (event.key === "Escape") {
+        if (helpOpen) setHelpOpen(false);
+        else if (typing) target?.blur();
+        else if (selectedId) setSelectedId(null);
+        return;
+      }
+      if (typing) {
+        // From the search box, ↓ drops straight into the results.
+        if (event.key === "ArrowDown" && target === searchRef.current && cards().length > 0) {
+          event.preventDefault();
+          focusCard(cards()[0]);
+        }
+        return;
+      }
+      if (event.key === "/") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      } else if (event.key === "?") {
+        event.preventDefault();
+        setHelpOpen((v) => !v);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        const list = cards();
+        if (list.length === 0) return;
+        event.preventDefault();
+        let index = list.findIndex((c) => c === document.activeElement);
+        if (index === -1 && selectedId) index = list.findIndex((c) => c.dataset.card === selectedId);
+        const next = event.key === "ArrowDown" ? index + 1 : index - 1;
+        focusCard(list[Math.max(0, Math.min(list.length - 1, next))]);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [helpOpen, selectedId]);
+
   function dismissToast(key: string) {
     setToasts((prev) => prev.filter((t) => t.key !== key));
   }
@@ -268,7 +320,10 @@ export function FeedbackDashboard() {
             Bugun, {today}
           </p>
         </div>
-        <SearchBox ref={searchRef} value={query} onChange={setQuery} />
+        <div className="flex items-center gap-2.5">
+          <SearchBox ref={searchRef} value={query} onChange={setQuery} />
+          <ShortcutsHelp open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} onClose={() => setHelpOpen(false)} />
+        </div>
       </div>
 
       <PushNotificationBanner />
@@ -308,7 +363,7 @@ export function FeedbackDashboard() {
       />
 
       <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
-        <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1" onScroll={handleListScroll}>
+        <div ref={listRef} className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1" onScroll={handleListScroll}>
           {data && (
             <div className="flex flex-shrink-0 items-center justify-between gap-3 px-1 text-[13px] text-gray-500" aria-live="polite">
               <span data-testid="result-count">
@@ -348,8 +403,9 @@ export function FeedbackDashboard() {
               <button
                 key={item.id}
                 type="button"
+                data-card={item.id}
                 onClick={() => setSelectedId(item.id)}
-                className="flex w-full flex-col gap-2 rounded-xl border-[1.5px] px-4 py-3 text-left"
+                className="flex w-full flex-col gap-2 rounded-xl border-[1.5px] px-4 py-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-teal/40"
                 style={{
                   background: (active ? SELECTED : IDLE).bg,
                   borderColor: (active ? SELECTED : IDLE).border,
