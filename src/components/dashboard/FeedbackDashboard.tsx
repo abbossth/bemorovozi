@@ -165,6 +165,28 @@ export function FeedbackDashboard() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const knownIdsRef = useRef<Set<string> | null>(null);
 
+  // The stats strip gets out of the way while the list is scrolled down (more room for reports) and comes
+  // back as soon as the user scrolls up or reaches the top. Only the list column scrolls on large screens;
+  // on small ones the whole page scrolls and the strip simply scrolls away with it.
+  const [statsHidden, setStatsHidden] = useState(false);
+  const lastScrollTopRef = useRef(0);
+  const scrollLockUntilRef = useRef(0);
+  function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
+    const top = event.currentTarget.scrollTop;
+    const delta = top - lastScrollTopRef.current;
+    lastScrollTopRef.current = top;
+    // While the strip animates the list resizes, which can nudge scrollTop — ignore that echo.
+    if (Date.now() < scrollLockUntilRef.current) return;
+    let hide = statsHidden;
+    if (top < 24) hide = false;
+    else if (delta > 6) hide = true;
+    else if (delta < -6) hide = false;
+    if (hide !== statsHidden) {
+      scrollLockUntilRef.current = Date.now() + 400;
+      setStatsHidden(hide);
+    }
+  }
+
   useEffect(() => {
     if (!data) return;
     // Alerts come from the newest reports as a whole — never from the filtered list — so changing the
@@ -251,13 +273,24 @@ export function FeedbackDashboard() {
 
       <PushNotificationBanner />
 
-      <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-        <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} />
-        <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor={TONE.danger.fg} />
-        <StatCard
-          label="O'rtacha javob vaqti"
-          value={data?.stats.avgResponseMinutes != null ? `${data.stats.avgResponseMinutes} daqiqa` : "—"}
-        />
+      <div
+        className={`grid flex-shrink-0 transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
+          statsHidden ? "grid-rows-[0fr] opacity-0 lg:-mb-5" : "grid-rows-[1fr] opacity-100"
+        }`}
+        aria-hidden={statsHidden}
+        data-testid="stats-strip"
+        data-hidden={statsHidden}
+      >
+        <div className="min-h-0 overflow-hidden">
+        <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} />
+          <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor={TONE.danger.fg} />
+          <StatCard
+            label="O'rtacha javob vaqti"
+            value={data?.stats.avgResponseMinutes != null ? `${data.stats.avgResponseMinutes} daqiqa` : "—"}
+          />
+        </div>
+        </div>
       </div>
 
       <FilterBar
@@ -275,7 +308,7 @@ export function FeedbackDashboard() {
       />
 
       <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
-        <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1">
+        <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1" onScroll={handleListScroll}>
           {data && (
             <div className="flex flex-shrink-0 items-center justify-between gap-3 px-1 text-[13px] text-gray-500" aria-live="polite">
               <span data-testid="result-count">
