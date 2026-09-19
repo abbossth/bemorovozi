@@ -39,3 +39,25 @@ h2,
 h3 {
   font-family: var(--font-heading);
 }
+
+/* Loading placeholders: a soft shimmer sweeping across a neutral block. */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #eceff0 25%, #f6f8f8 50%, #eceff0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

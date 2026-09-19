@@ -5,6 +5,7 @@ import useSWR from "swr";
 import Image from "next/image";
 import { LogoMark } from "@/components/Logo";
 import { TelegramLinkCard } from "./TelegramLinkCard";
+import { LoadingRegion, Skeleton } from "@/components/Skeleton";
 import { PushSettingsCard } from "./PushSettingsCard";
 import { greetingFor } from "@/lib/conversation/engine";
 
@@ -18,7 +19,16 @@ function HospitalNameCard() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  if (!data || "error" in data) return null;
+  if (!data) {
+    return (
+      <LoadingRegion className="flex flex-col gap-3 rounded-[14px] border border-gray-200 bg-white p-4 sm:p-5" label="Shifoxona nomi yuklanmoqda…">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="h-[46px] w-full rounded-[10px]" />
+        <Skeleton className="h-9 w-full rounded-lg" />
+      </LoadingRegion>
+    );
+  }
+  if ("error" in data) return null;
   const value = draft ?? data.name;
   const dirty = value.trim() !== data.name;
 
@@ -175,7 +185,19 @@ export function SettingsPage() {
           </div>
 
           <div className="flex max-h-[420px] flex-col gap-2.5 overflow-y-auto">
-            {isLoading && <p className="text-sm text-gray-500">Yuklanmoqda...</p>}
+            {isLoading && (
+              <LoadingRegion className="flex flex-col gap-2.5" label="Bo'limlar yuklanmoqda…">
+                {Array.from({ length: 3 }, (_, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-xl border-[1.5px] border-gray-200 bg-white px-[18px] py-4">
+                    <Skeleton className="h-9 w-9 flex-shrink-0 rounded-lg" />
+                    <div className="flex flex-1 flex-col gap-2">
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </LoadingRegion>
+            )}
             {!isLoading && items.length === 0 && (
               <p className="text-sm text-gray-500">Hali bo&apos;lim qo&apos;shilmagan.</p>
             )}
@@ -256,6 +278,17 @@ export function SettingsPage() {
                 PDF yuklab olish
               </a>
             </>
+          ) : isLoading ? (
+            <LoadingRegion
+              className="flex flex-col items-center gap-3.5 rounded-[20px] border border-gray-200 bg-white px-7 py-8"
+              label="QR karta yuklanmoqda…"
+            >
+              <Skeleton className="h-10 w-10 rounded-lg" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-[168px] w-[168px] rounded-lg" />
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3.5 w-32" />
+            </LoadingRegion>
           ) : (
             <div className="flex flex-grow items-center justify-center rounded-[20px] border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
               QR karta ko&apos;rish uchun bo&apos;lim tanlang yoki yangi bo&apos;lim qo&apos;shing.

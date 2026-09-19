@@ -12,6 +12,7 @@ import { buildFeedbackPayload } from "@/lib/push/payload";
 import { SystemicTag, Tag } from "@/components/Tag";
 import { Avatar } from "@/components/Avatar";
 import { OverviewPanel, type Overview } from "@/components/dashboard/OverviewPanel";
+import { LoadingRegion, Skeleton } from "@/components/Skeleton";
 import { FilterBar, SearchBox, type RangeKey } from "@/components/dashboard/FilterBar";
 import { ShortcutsHelp } from "@/components/dashboard/ShortcutsHelp";
 import { formatClock, formatDayMonth, formatDateTime, shortName } from "@/lib/ui/format";
@@ -44,6 +45,8 @@ type FeedbackItem = {
 };
 
 type DashboardResponse = {
+  /** the date range this response was built for (see rangeKey() below) */
+  rangeKey: string;
   items: FeedbackItem[];
   /** the list hit the server's size cap */
   truncated: boolean;
@@ -78,6 +81,27 @@ function rangeBounds(range: RangeKey, customFrom: string, customTo: string): { f
     };
   }
   return {};
+}
+
+/** Same string the server echoes back as `rangeKey`, so a response can be matched to the range asked for. */
+const rangeKey = (bounds: { from?: Date; to?: Date }) => `${bounds.from?.toISOString() ?? ""}|${bounds.to?.toISOString() ?? ""}`;
+
+/** Placeholder shaped like a report card (badges + time on the first row, then two lines of text). */
+function FeedCardSkeleton() {
+  return (
+    <div className="flex w-full flex-col gap-2.5 rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="h-6 w-14 rounded-full" />
+          <Skeleton className="h-6 w-28 rounded-full" />
+        </div>
+        <Skeleton className="h-5 w-12" />
+      </div>
+      <Skeleton className="h-4 w-11/12" />
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  );
 }
 
 /** Day buckets and "today" follow this browser's clock (minutes east of UTC), not the server's. */
@@ -125,8 +149,9 @@ export function FeedbackDashboard() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
 
+  const bounds = rangeBounds(range, customFrom, customTo);
   const { data, mutate } = useSWR<DashboardResponse>(
-    `/api/dashboard/feedback${buildQuery(rangeBounds(range, customFrom, customTo))}`,
+    `/api/dashboard/feedback${buildQuery(bounds)}`,
     fetcher,
     {
       refreshInterval: 15000,
@@ -144,6 +169,10 @@ export function FeedbackDashboard() {
   );
   const [advancing, setAdvancing] = useState(false);
 
+  // Loading = nothing yet (first visit), or a new date range was picked and its list hasn't arrived — the
+  // previous range's reports stay in `data` meanwhile (keepPreviousData), but must not pass for the new list.
+  const firstLoad = !data;
+  const listLoading = firstLoad || data.rangeKey !== rangeKey(bounds);
   const items = useMemo(() => data?.items ?? [], [data]);
   // Severity + department + search narrow the list together (the date range is applied by the server).
   const filtered = useMemo(
@@ -338,10 +367,11 @@ export function FeedbackDashboard() {
       >
         <div className="min-h-0 overflow-hidden">
         <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-          <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} />
-          <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor={TONE.danger.fg} />
+          <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} loading={firstLoad} />
+          <StatCard label="Yuqori jiddiylik" value={data?.stats.highCount ?? "—"} valueColor={TONE.danger.fg} loading={firstLoad} />
           <StatCard
             label="O'rtacha javob vaqti"
+            loading={firstLoad}
             value={data?.stats.avgResponseMinutes != null ? `${data.stats.avgResponseMinutes} daqiqa` : "—"}
           />
         </div>
@@ -364,76 +394,87 @@ export function FeedbackDashboard() {
 
       <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
         <div ref={listRef} className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1" onScroll={handleListScroll}>
-          {data && (
-            <div className="flex flex-shrink-0 items-center justify-between gap-3 px-1 text-[13px] text-gray-500" aria-live="polite">
-              <span data-testid="result-count">
-                {filtersActive ? (
-                  <>
-                    <b className="text-ink">{filtered.length}</b> / {items.length} ta xabar
-                  </>
-                ) : (
-                  <>{items.length} ta xabar</>
-                )}
-                {data.truncated && " · oxirgi 500 tasi"}
-              </span>
-              {filtersActive && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilter("all");
-                    setDepartment("all");
-                    setQuery("");
-                    setRange("all");
-                  }}
-                  className="font-bold text-teal"
-                >
-                  Filtrlarni tozalash
-                </button>
-              )}
-            </div>
-          )}
-          {filtered.length === 0 && (
-            <p className="mt-10 text-center text-sm text-gray-500">
-              {filtersActive ? "Filtrga mos xabar topilmadi." : "Hozircha xabarlar yo'q."}
-            </p>
-          )}
-          {filtered.map((item) => {
-            const active = item.id === selectedId;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                data-card={item.id}
-                onClick={() => setSelectedId(item.id)}
-                className="flex w-full flex-col gap-2 rounded-xl border-[1.5px] px-4 py-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-teal/40"
-                style={{
-                  background: (active ? SELECTED : IDLE).bg,
-                  borderColor: (active ? SELECTED : IDLE).border,
-                }}
-              >
-                {/* One compact row: severity · status · department · flags, with the time pulled out on the right */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <SeverityBadge severity={item.severity} />
-                    <StatusBadge status={item.status} />
-                    <span className="rounded-full bg-gray-100 px-2.5 py-[3px] text-xs font-medium text-gray-600">
-                      {item.dept}
-                    </span>
-                    {item.kind === "taklif" && <Tag tone="success">Taklif</Tag>}
-                    {item.routedToManagement && <Tag tone="warning">Rahbariyatga</Tag>}
-                    {item.isSystemic && <SystemicTag count={item.clusterCount} />}
-                  </div>
-                  <time
-                    dateTime={item.createdAt}
-                    className="flex-shrink-0 pt-0.5 font-heading text-[15px] font-extrabold tabular-nums text-ink"
+          {listLoading ? (
+            <LoadingRegion className="flex flex-col gap-3" label="Xabarlar yuklanmoqda…">
+              <Skeleton className="h-4 w-28" />
+              {Array.from({ length: 6 }, (_, i) => (
+                <FeedCardSkeleton key={i} />
+              ))}
+            </LoadingRegion>
+          ) : (
+            <>
+            {data && (
+              <div className="flex flex-shrink-0 items-center justify-between gap-3 px-1 text-[13px] text-gray-500" aria-live="polite">
+                <span data-testid="result-count">
+                  {filtersActive ? (
+                    <>
+                      <b className="text-ink">{filtered.length}</b> / {items.length} ta xabar
+                    </>
+                  ) : (
+                    <>{items.length} ta xabar</>
+                  )}
+                  {data.truncated && " · oxirgi 500 tasi"}
+                </span>
+                {filtersActive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilter("all");
+                      setDepartment("all");
+                      setQuery("");
+                      setRange("all");
+                    }}
+                    className="font-bold text-teal"
                   >
-                    {formatWhen(item.createdAt)}
-                  </time>
-                </div>
-                <p className="text-[15px] leading-snug text-ink">{item.summary}</p>
-              </button>
-            );
-          })}
+                    Filtrlarni tozalash
+                  </button>
+                )}
+              </div>
+            )}
+            {filtered.length === 0 && (
+              <p className="mt-10 text-center text-sm text-gray-500">
+                {filtersActive ? "Filtrga mos xabar topilmadi." : "Hozircha xabarlar yo'q."}
+              </p>
+            )}
+            {filtered.map((item) => {
+              const active = item.id === selectedId;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-card={item.id}
+                  onClick={() => setSelectedId(item.id)}
+                  className="flex w-full flex-col gap-2 rounded-xl border-[1.5px] px-4 py-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-teal/40"
+                  style={{
+                    background: (active ? SELECTED : IDLE).bg,
+                    borderColor: (active ? SELECTED : IDLE).border,
+                  }}
+                >
+                  {/* One compact row: severity · status · department · flags, with the time pulled out on the right */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <SeverityBadge severity={item.severity} />
+                      <StatusBadge status={item.status} />
+                      <span className="rounded-full bg-gray-100 px-2.5 py-[3px] text-xs font-medium text-gray-600">
+                        {item.dept}
+                      </span>
+                      {item.kind === "taklif" && <Tag tone="success">Taklif</Tag>}
+                      {item.routedToManagement && <Tag tone="warning">Rahbariyatga</Tag>}
+                      {item.isSystemic && <SystemicTag count={item.clusterCount} />}
+                    </div>
+                    <time
+                      dateTime={item.createdAt}
+                      className="flex-shrink-0 pt-0.5 font-heading text-[15px] font-extrabold tabular-nums text-ink"
+                    >
+                      {formatWhen(item.createdAt)}
+                    </time>
+                  </div>
+                  <p className="text-[15px] leading-snug text-ink">{item.summary}</p>
+                </button>
+              );
+            })}
+            </>
+          )}
         </div>
 
         <div className="flex min-h-0 w-full flex-shrink-0 flex-col rounded-[14px] border border-gray-200 bg-white p-5 sm:p-6 lg:w-[360px] lg:overflow-y-auto">
@@ -561,7 +602,7 @@ export function FeedbackDashboard() {
               </div>
             </div>
           ) : (
-            <OverviewPanel overview={data?.overview} byDepartment={byDepartment} />
+            <OverviewPanel overview={data?.overview} byDepartment={byDepartment} loading={firstLoad} departmentsLoading={listLoading} />
           )}
         </div>
       </div>

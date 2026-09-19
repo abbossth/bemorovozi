@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { LoadingRegion, Skeleton } from "@/components/Skeleton";
 
 type Status = { connected: boolean; notificationMode: "realtime" | "digest" };
 
@@ -70,7 +71,10 @@ export function TelegramLinkCard() {
       {error && <p className="mt-3 rounded-lg bg-coral-tint px-3 py-2 text-[13px] text-coral">{error}</p>}
 
       {isLoading ? (
-        <p className="mt-4 text-sm text-gray-500">Yuklanmoqda...</p>
+        <LoadingRegion className="mt-4 flex flex-col gap-3" label="Telegram holati yuklanmoqda…">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-10 w-full rounded-[10px]" />
+        </LoadingRegion>
       ) : data?.connected ? (
         <div className="mt-4 flex flex-col gap-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-teal">

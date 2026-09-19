@@ -116,6 +116,8 @@ export async function GET(request: Request) {
 
 
   return NextResponse.json({
+    // Echo of the range this list was built for — lets the client tell "still the old range" from "new data".
+    rangeKey: `${from?.toISOString() ?? ""}|${to?.toISOString() ?? ""}`,
     items: items.map(toItem),
     truncated: items.length >= MAX_ITEMS,
     latest: latestItems.map(toItem),

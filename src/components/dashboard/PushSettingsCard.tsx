@@ -1,13 +1,23 @@
 "use client";
 
 import { usePushNotifications } from "./usePushNotifications";
+import { LoadingRegion, Skeleton } from "@/components/Skeleton";
 
 export function PushSettingsCard() {
   const push = usePushNotifications();
 
+  // First render of the browser check: a placeholder instead of flashing "Tekshirilmoqda..." text.
+  if (push.support === "checking") {
+    return (
+      <LoadingRegion className="flex flex-col gap-2.5 rounded-[14px] border border-gray-200 bg-white p-4 sm:p-5" label="Bildirishnomalar tekshirilmoqda…">
+        <Skeleton className="h-4 w-56" />
+        <Skeleton className="h-3.5 w-3/4" />
+      </LoadingRegion>
+    );
+  }
+
   let status: string;
-  if (push.support === "checking") status = "Tekshirilmoqda...";
-  else if (push.support === "unconfigured") status = "Server tomonida sozlanmagan (VAPID kalitlari yo'q).";
+  if (push.support === "unconfigured") status = "Server tomonida sozlanmagan (VAPID kalitlari yo'q).";
   else if (push.support === "unsupported")
     status = push.needsInstall
       ? "iPhone'da avval sahifani Bosh ekranga qo'shing (Ulashish → Bosh ekranga qo'shish), so'ng shu yerdan yoqing."

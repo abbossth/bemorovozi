@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { formatDateTime } from "@/lib/ui/format";
+import { LoadingRegion, Skeleton } from "@/components/Skeleton";
 
 type Lead = {
   id: string;
@@ -54,7 +55,7 @@ function formatTime(iso: string) {
 }
 
 export function LeadsDashboard() {
-  const { data, mutate } = useSWR<{ items: Lead[] }>("/api/leads", fetcher, { refreshInterval: 15000 });
+  const { data, mutate, isLoading } = useSWR<{ items: Lead[] }>("/api/leads", fetcher, { refreshInterval: 15000 });
   const [filter, setFilter] = useState<"all" | Lead["status"]>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
@@ -112,7 +113,24 @@ export function LeadsDashboard() {
 
       <div className="flex min-h-0 flex-col gap-4 lg:flex-grow lg:flex-row lg:gap-6">
         <div className="flex min-h-0 flex-col gap-3 lg:flex-grow lg:overflow-y-auto lg:pr-1">
-          {filtered.length === 0 && <p className="mt-10 text-center text-sm text-gray-500">Hozircha lidlar yo&apos;q.</p>}
+          {isLoading && (
+            <LoadingRegion className="flex flex-col gap-3" label="Lidlar yuklanmoqda…">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="flex flex-col gap-2.5 rounded-xl border-[1.5px] border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-6 w-28 rounded-full" />
+                    <Skeleton className="h-4 w-14" />
+                  </div>
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-3.5 w-2/3" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              ))}
+            </LoadingRegion>
+          )}
+          {!isLoading && filtered.length === 0 && (
+            <p className="mt-10 text-center text-sm text-gray-500">Hozircha lidlar yo&apos;q.</p>
+          )}
           {filtered.map((lead) => {
             const active = lead.id === selectedId;
             const statusMeta = STATUS_META[lead.status];
