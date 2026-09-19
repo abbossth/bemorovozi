@@ -21,7 +21,7 @@ type SttResponse = {
   error?: string;
 };
 
-/** Speech-to-text: raw audio bytes in, Uzbek transcript out. */
+/** Speech-to-text: raw audio bytes in, Uzbek transcript out ("" when the clip has no speech). */
 export async function speechToText(audio: Buffer, mimeType: string): Promise<string> {
   const { apiKey, baseUrl } = requireConfig();
 
@@ -36,10 +36,12 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
   });
 
   const data = (await res.json()) as SttResponse;
-  if (!res.ok || !data.success || !data.data?.text) {
+  if (!res.ok || !data.success) {
     throw new Error(`NeuronAI STT so'rovi muvaffaqiyatsiz: ${res.status} ${data.error ?? ""}`);
   }
-  return data.data.text;
+  // A successful call with no text means "no speech in this clip" (silence, room
+  // noise) — a normal answer, not a failure. The caller decides what to do with it.
+  return data.data?.text?.trim() ?? "";
 }
 
 /** Text-to-speech: Uzbek text in, audio bytes (wav) out. */

@@ -53,6 +53,10 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
   const [vadDebug, setVadDebug] = useState<string | null>(null);
 
   const activeRef = useRef(true);
+  // Bumped on every mount/unmount. React StrictMode (dev) mounts, unmounts and re-mounts
+  // effects, which would otherwise leave TWO startCall() runs alive at once — two mic
+  // streams, two greetings, two listening loops fighting over the same refs.
+  const generationRef = useRef(0);
   const orbApiRef = useRef<VoiceOrbHandle | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -69,8 +73,12 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
 
   useEffect(() => {
     activeRef.current = true;
-    startCall();
+    const generation = ++generationRef.current;
+    startCall(generation);
     return () => {
+      // A counter, not a DOM ref — reading the latest value here is the point.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      generationRef.current++;
       activeRef.current = false;
       teardown();
     };
@@ -105,27 +113,29 @@ export function VoiceCallScreen({ departmentName, floorLabel, audioElRef, submit
     return ctx;
   }
 
-  async function startCall() {
+  async function startCall(generation: number) {
+    const superseded = () => generation !== generationRef.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
-      if (!activeRef.current) {
+      if (superseded()) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
       streamRef.current = stream;
     } catch {
+      if (superseded()) return;
       setMicError("Mikrofonga ruxsat berilmadi. Iltimos, brauzer sozlamalaridan ruxsat bering.");
       setCallState("denied");
       return;
     }
 
     await calibrateNoiseFloor();
-    if (!activeRef.current) return;
+    if (superseded()) return;
 
     await speak(INITIAL_VOICE_TURN.text);
-    if (!activeRef.current) return;
+    if (superseded()) return;
     startListening();
   }
 

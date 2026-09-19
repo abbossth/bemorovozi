@@ -54,9 +54,9 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
   const submitted = (await submitRes.json()) as SttTranscription;
 
   // Synchronous short clips can come back already completed.
-  if (submitted.status === "completed" && submitted.transcript) {
+  if (submitted.status === "completed") {
     mark("voicelab.stt.completedSynchronously");
-    return submitted.transcript;
+    return submitted.transcript?.trim() ?? "";
   }
 
   const pollStart = Date.now();
@@ -73,9 +73,8 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
 
     const polled = (await pollRes.json()) as SttTranscription;
     if (polled.status === "completed") {
-      if (!polled.transcript) throw new Error("VoiceLab STT bo'sh transkript qaytardi");
       mark("voicelab.stt.poll.total", { pollCount, ms: Date.now() - pollStart });
-      return polled.transcript;
+      return polled.transcript?.trim() ?? ""; // empty = no speech in the clip, not a failure
     }
     if (polled.status === "failed") {
       throw new Error(`VoiceLab STT muvaffaqiyatsiz tugadi: ${polled.error ?? "noma'lum xato"}`);
