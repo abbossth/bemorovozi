@@ -20,6 +20,13 @@ yo'naltiruvchi platforma. Umummilliy AI Xakaton (Xorazm, 2026) uchun.
 - **Ovoz**: STT/TTS qatlami (`src/lib/voice`) — **NeuronAI** asosiy (`VOICE_PROVIDER`),
   ishlamasa yoki balansi tugasa **VoiceLab**'ga avtomatik o'tadi. Ovoz suhbat mantig'iga
   qo'shilmaydi: STT matn beradi, motorning matn javobi TTS bilan o'qiladi
+- **Bildirishnomalar**: xodim paneli **Web Push** (service worker + VAPID) orqali yangi
+  xabarni operatsion tizim bildirishnomasi qilib yuboradi — boshqa ilova ustida ishlayotgan
+  yoki tab yopiq bo'lsa ham keladi. Ikki qatlam: web push (tab yopiq bo'lsa ham) va
+  lokal (panel tabi orqada ochiq turganda o'zi yangi xabarni topib ko'rsatadi — brauzerning
+  push kanali ishlamasa ham). Ruxsat panelda tugma bosilganda so'raladi
+  (`PushNotificationBanner`, Sozlamalar). Telegram bilan parallel ishlaydi
+  (`src/lib/push`, `public/sw.js`)
 - **QR + PDF**: `qrcode` + `@react-pdf/renderer`
 - **Telegram**: ikkita bot (grammY) — xodim bildirishnoma boti va anonim bemor
   boti, ikkalasi ham `src/lib/createFeedback.ts`dagi bitta pipeline'ni ishlatadi
@@ -36,6 +43,8 @@ web config + Admin SDK, VoiceLab). Ixtiyoriy qolgan narsa:
 
 - `ANTHROPIC_API_KEY` — agar Claude'ga o'tmoqchi bo'lsangiz (`AI_PROVIDER=anthropic`)
 - `CONVERSATION_SECRET` — suhbat holati tokenini imzolaydi (`openssl rand -hex 32`)
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` — panel bildirishnomalari
+  uchun (`npx web-push generate-vapid-keys`); public kalit build vaqtida kerak
 
 To'liq ro'yxat uchun `.env.example`ga qarang.
 

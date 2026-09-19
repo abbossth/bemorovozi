@@ -5,6 +5,7 @@
 // STT is asynchronous — POST returns a queued job id, which we poll until "completed".
 
 import { time, mark } from "@/lib/timing";
+import { audioFileName } from "./mime";
 
 const STT_POLL_INTERVAL_MS = 1000;
 const STT_POLL_TIMEOUT_MS = 25000;
@@ -32,7 +33,7 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
   const { apiKey, baseUrl } = requireConfig();
 
   const form = new FormData();
-  form.append("audio", new Blob([new Uint8Array(audio)], { type: mimeType }), "voice.webm");
+  form.append("audio", new Blob([new Uint8Array(audio)], { type: mimeType }), audioFileName(mimeType));
   form.append("language", "uz");
   form.append("include_speakers", "false");
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { VoiceOrb, type OrbPhase, type VoiceOrbHandle } from "@/components/patient/VoiceOrb";
 import { SpeechDetector, rmsToDb } from "@/lib/voice/vad";
 import { createMicMeter, sampleAmbientDb, type MicMeter } from "@/lib/voice/micMeter";
+import { blobToWav, needsWavConversion } from "@/lib/voice/wav";
 import type { ChatMessage, Stage } from "@/lib/conversation/types";
 
 // Voice is only a thin layer over the ONE conversation engine:
@@ -201,7 +202,7 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunks.push(e.data);
     };
-    recorder.onstop = () => handleRecordingStopped(chunks);
+    recorder.onstop = () => handleRecordingStopped(chunks, recorder.mimeType);
     recorderRef.current = recorder;
     recorder.start();
   }
@@ -344,12 +345,20 @@ export function VoiceControls({ audioElRef, messages, epoch, stage, busy, onUtte
     setPhase("stuck");
   }
 
-  async function handleRecordingStopped(chunks: Blob[]) {
+  async function handleRecordingStopped(chunks: Blob[], mimeType: string) {
     if (!activeRef.current) return;
     setPhase("thinking");
     try {
+      // Label the recording with what the browser really produced (Chrome: webm, Safari: mp4). Anything
+      // the STT provider can't read (Safari's mp4) is converted to WAV here first.
+      let audio = new Blob(chunks, { type: mimeType || chunks[0]?.type || "audio/webm" });
+      let fileName = audio.type.includes("ogg") ? "voice.ogg" : "voice.webm";
+      if (needsWavConversion(audio.type)) {
+        audio = await blobToWav(audio);
+        fileName = "voice.wav";
+      }
       const form = new FormData();
-      form.append("audio", new Blob(chunks, { type: "audio/webm" }), "voice.webm");
+      form.append("audio", audio, fileName);
       const sttRes = await fetch("/api/voice/stt", { method: "POST", body: form });
       const sttData = await sttRes.json();
       if (!sttRes.ok) throw new Error(sttData.error ?? "Ovozni tanib bo'lmadi");

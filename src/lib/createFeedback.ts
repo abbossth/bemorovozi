@@ -3,7 +3,9 @@ import Department from "@/models/Department";
 import Feedback from "@/models/Feedback";
 import { ai } from "@/lib/ai";
 import { generateTrackingCode } from "@/lib/trackingCode";
+import { after } from "next/server";
 import { notifyStaffForFeedback } from "@/lib/telegram/notifyStaff";
+import { pushForFeedback } from "@/lib/push/send";
 import { time, mark } from "@/lib/timing";
 
 export class DepartmentNotFoundError extends Error {}
@@ -102,15 +104,25 @@ export async function createFeedback({ hospitalId, departmentId, channel, transc
 
   mark("createFeedback.total", { ms: Date.now() - totalStart });
 
-  // Best-effort — a Telegram outage must never block a patient's submission.
+  // Best-effort — a Telegram or push outage must never block a patient's submission. `after` keeps
+  // the work alive past the response on serverless (a bare un-awaited promise can be frozen).
   const notifyStart = Date.now();
-  notifyStaffForFeedback(feedback, department)
-    .catch((error) => {
-      console.error("[createFeedback] Staff notification failed:", error);
-    })
-    .finally(() => {
-      mark("createFeedback.notifyStaff.backgroundTotal", { ms: Date.now() - notifyStart });
-    });
+  const notifyAll = async () => {
+    const results = await Promise.allSettled([
+      notifyStaffForFeedback(feedback, department),
+      pushForFeedback(feedback, department),
+    ]);
+    for (const result of results) {
+      if (result.status === "rejected") console.error("[createFeedback] Staff notification failed:", result.reason);
+    }
+    mark("createFeedback.notifyStaff.backgroundTotal", { ms: Date.now() - notifyStart });
+  };
+  try {
+    after(notifyAll);
+  } catch {
+    // Called outside a request scope (e.g. a script): just run it.
+    void notifyAll();
+  }
 
   return feedback;
 }

@@ -4,6 +4,8 @@
 //
 // Both endpoints are synchronous — no polling needed, unlike VoiceLab's async STT.
 
+import { audioFileName } from "./mime";
+
 function requireConfig() {
   const apiKey = process.env.NEURONAI_API_KEY;
   const baseUrl = process.env.NEURONAI_API_BASE_URL ?? "https://my.neuronai.uz/api";
@@ -26,7 +28,7 @@ export async function speechToText(audio: Buffer, mimeType: string): Promise<str
   const { apiKey, baseUrl } = requireConfig();
 
   const form = new FormData();
-  form.append("file", new Blob([new Uint8Array(audio)], { type: mimeType }), "voice.webm");
+  form.append("file", new Blob([new Uint8Array(audio)], { type: mimeType }), audioFileName(mimeType));
   form.append("language", "uz");
 
   const res = await fetch(`${baseUrl}/v2/stt/transcribe`, {

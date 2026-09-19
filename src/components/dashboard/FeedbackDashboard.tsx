@@ -6,6 +6,9 @@ import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge, NEXT_STATUS, NEXT_STATUS_LABEL, type Status } from "@/components/StatusBadge";
 import { StatCard } from "@/components/StatCard";
 import { NewFeedbackToasts, type Toast } from "@/components/dashboard/NewFeedbackToasts";
+import { PushNotificationBanner } from "@/components/dashboard/PushNotificationBanner";
+import { isNotifyEnabled, showLocalNotification } from "@/components/dashboard/localNotify";
+import { buildFeedbackPayload } from "@/lib/push/payload";
 import { playSeverityAlert } from "@/lib/notificationSound";
 import type { Severity } from "@/lib/ai/types";
 
@@ -51,10 +54,16 @@ function formatTime(iso: string) {
 export function FeedbackDashboard() {
   const { data, mutate } = useSWR<DashboardResponse>("/api/dashboard/feedback", fetcher, {
     refreshInterval: 15000,
+    // Keep polling while the tab is in the background — that is exactly when a notification is wanted.
+    refreshWhenHidden: true,
     revalidateOnFocus: true,
   });
   const [filter, setFilter] = useState<"all" | Severity>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A clicked push notification opens /dashboard?feedback=<id> — start with that item selected.
+  // (The list is fetched client-side, so nothing about it is in the server HTML to mismatch.)
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("feedback")
+  );
   const [advancing, setAdvancing] = useState(false);
 
   const items = useMemo(() => data?.items ?? [], [data]);
@@ -90,6 +99,26 @@ export function FeedbackDashboard() {
         const bySeverityRank: Record<Severity, number> = { yuqori: 2, orta: 1, past: 0 };
         const loudest = newItems.reduce((a, b) => (bySeverityRank[b.severity] > bySeverityRank[a.severity] ? b : a));
         playSeverityAlert(loudest.severity);
+
+        // Tab in the background (another tab or app in front): raise an OS notification too. Same tag as
+        // the web push, so if the push already got there this is a no-op — never two banners.
+        if ((document.visibilityState === "hidden" || !document.hasFocus()) && isNotifyEnabled()) {
+          newItems.slice(0, 3).forEach((i) => {
+            void showLocalNotification(
+              buildFeedbackPayload(
+                {
+                  _id: i.id,
+                  severity: i.severity,
+                  aiSummary: i.summary,
+                  transcript: i.excerpt,
+                  kind: i.kind,
+                  routedToManagement: i.routedToManagement,
+                },
+                { name: i.dept }
+              )
+            ).catch(() => {});
+          });
+        }
       }
     }
     // First load just establishes the baseline — no toasts/sound for pre-existing items.
@@ -125,6 +154,8 @@ export function FeedbackDashboard() {
           Bugun, {today}
         </p>
       </div>
+
+      <PushNotificationBanner />
 
       <div className="grid flex-shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
         <StatCard label="Bugungi xabarlar" value={data?.stats.todayCount ?? "—"} />

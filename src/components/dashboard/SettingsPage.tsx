@@ -5,6 +5,7 @@ import useSWR from "swr";
 import Image from "next/image";
 import { LogoMark } from "@/components/Logo";
 import { TelegramLinkCard } from "./TelegramLinkCard";
+import { PushSettingsCard } from "./PushSettingsCard";
 import { greetingFor } from "@/lib/conversation/engine";
 
 type DepartmentItem = { id: string; name: string; url: string; qrDataUrl: string };
@@ -263,6 +264,7 @@ export function SettingsPage() {
         </div>
       </div>
 
+      <PushSettingsCard />
       <TelegramLinkCard />
     </div>
   );
