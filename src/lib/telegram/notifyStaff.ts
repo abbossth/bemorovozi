@@ -10,6 +10,11 @@ type NotifiableFeedback = {
   transcript: string;
   trackingCode: string;
   createdAt?: Date;
+  kind?: string;
+  roomOrWard?: string;
+  staffName?: string;
+  occurredAt?: string;
+  routedToManagement?: boolean;
 };
 
 /**
@@ -34,8 +39,18 @@ export async function notifyStaffForFeedback(feedback: NotifiableFeedback, depar
   });
   if (staffList.length === 0) return;
 
-  const recipients =
-    feedback.severity === "yuqori" ? staffList : staffList.filter((s) => s.telegramNotificationMode === "realtime");
+  const highSeverity = feedback.severity === "yuqori";
+  let recipients: typeof staffList;
+  if (feedback.routedToManagement) {
+    // Staff-conduct complaints skip the department: management (admins) is told immediately,
+    // whatever their digest preference. If nobody with the admin role is linked yet, don't lose
+    // it — fall back to everyone linked. High severity still reaches everyone, as always.
+    const management = staffList.filter((s) => s.role === "admin");
+    const targets = management.length > 0 ? management : staffList;
+    recipients = highSeverity ? staffList : targets;
+  } else {
+    recipients = highSeverity ? staffList : staffList.filter((s) => s.telegramNotificationMode === "realtime");
+  }
   if (recipients.length === 0) return;
 
   const bot = getStaffBot();
@@ -46,6 +61,11 @@ export async function notifyStaffForFeedback(feedback: NotifiableFeedback, depar
     transcript: feedback.transcript,
     trackingCode: feedback.trackingCode,
     createdAt: feedback.createdAt ?? new Date(),
+    routedToManagement: feedback.routedToManagement,
+    kind: feedback.kind,
+    roomOrWard: feedback.roomOrWard,
+    staffName: feedback.staffName,
+    occurredAt: feedback.occurredAt,
   });
   const keyboard = buildFeedbackKeyboard(feedbackId);
 

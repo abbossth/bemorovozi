@@ -5,10 +5,84 @@ import useSWR from "swr";
 import Image from "next/image";
 import { LogoMark } from "@/components/Logo";
 import { TelegramLinkCard } from "./TelegramLinkCard";
+import { greetingFor } from "@/lib/conversation/engine";
 
 type DepartmentItem = { id: string; name: string; url: string; qrDataUrl: string };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+function HospitalNameCard() {
+  const { data, mutate } = useSWR<{ name: string; canEdit: boolean }>("/api/hospital", fetcher);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  if (!data || "error" in data) return null;
+  const value = draft ?? data.name;
+  const dirty = value.trim() !== data.name;
+
+  async function save() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/hospital", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: value }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error ?? "Saqlab bo'lmadi");
+      setDraft(null);
+      await mutate();
+      setMessage({ ok: true, text: "Saqlandi" });
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : "Xatolik yuz berdi" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-[14px] border border-gray-200 bg-white p-4 sm:p-5">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-grow flex-col gap-1.5">
+          <label htmlFor="hospitalName" className="text-[13px] font-semibold text-ink">
+            Shifoxona nomi
+          </label>
+          <input
+            id="hospitalName"
+            type="text"
+            value={value}
+            disabled={!data.canEdit}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && dirty && save()}
+            maxLength={80}
+            className="w-full rounded-[10px] border border-gray-200 px-3.5 py-3 text-sm text-ink outline-none focus:border-teal disabled:bg-gray-50 disabled:text-gray-500"
+          />
+        </div>
+        {data.canEdit && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || !dirty || value.trim().length < 2}
+            className="whitespace-nowrap rounded-[10px] bg-teal px-[22px] py-[13px] font-heading text-sm font-bold text-white disabled:opacity-60"
+          >
+            {saving ? "Saqlanmoqda..." : "Saqlash"}
+          </button>
+        )}
+      </div>
+      <p className="rounded-lg bg-[#F7F9F8] px-3 py-2 text-[13px] leading-relaxed text-gray-500">
+        AI yordamchi bemorlarni shunday kutib oladi: <span className="font-semibold text-ink">“{greetingFor(value.trim() || "…")}”</span>
+      </p>
+      {message && (
+        <p className={`text-[13px] ${message.ok ? "text-teal" : "text-coral"}`} role="status">
+          {message.text}
+        </p>
+      )}
+      {!data.canEdit && <p className="text-xs text-gray-500">Nomni faqat administrator o&apos;zgartira oladi.</p>}
+    </div>
+  );
+}
 
 export function SettingsPage() {
   const { data, mutate, isLoading } = useSWR<{ items: DepartmentItem[] }>("/api/departments", fetcher);
@@ -63,10 +137,14 @@ export function SettingsPage() {
     <div className="flex min-h-screen flex-col gap-5 px-4 py-6 sm:gap-7 sm:px-6 sm:py-8 lg:px-12 lg:py-10">
       <div>
         <h1 className="font-heading text-2xl font-extrabold text-ink lg:text-[28px]">Sozlamalar</h1>
-        <p className="mt-1 text-sm text-gray-500">Bo&apos;lim va xonalarni boshqaring, ularning QR-kartalarini chop eting</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Shifoxona nomi, bo&apos;lim va xonalarni boshqaring, ularning QR-kartalarini chop eting
+        </p>
       </div>
 
       {error && <p className="rounded-lg bg-coral-tint px-3 py-2 text-[13px] text-coral">{error}</p>}
+
+      <HospitalNameCard />
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="flex flex-grow flex-col gap-5">

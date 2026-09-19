@@ -22,6 +22,19 @@ const FeedbackSchema = new Schema(
     // Where the submission came from. Never carries any Telegram-identifying data —
     // the patient bot deliberately never writes chat_id/user_id anywhere.
     source: { type: String, enum: ["web", "telegram"], default: "web" },
+    // Fields of the confirmed card from the AI conversation (web chat/voice). All optional —
+    // Telegram and older documents don't have them.
+    kind: { type: String, enum: ["shikoyat", "taklif"], default: "shikoyat" },
+    roomOrWard: { type: String },
+    staffName: { type: String },
+    occurredAt: { type: String }, // "when", as the patient described it ("Bugun, tushdan keyin")
+    // Staff-conduct complaints skip the department and notify management directly.
+    routedToManagement: { type: Boolean, default: false },
+    // The full back-and-forth (assistant + patient). `transcript` keeps only the patient's own words.
+    conversation: {
+      type: [{ _id: false, role: { type: String, enum: ["assistant", "patient"] }, text: String }],
+      default: undefined,
+    },
   },
   { timestamps: true }
 );

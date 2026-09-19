@@ -25,5 +25,4 @@ export const ai: AiProvider = {
     const result = await resolveProvider().classifyFeedback(input);
     return { ...result, issueTag: normalizeIssueTag(result.issueTag) };
   },
-  voiceDialogueTurn: (history) => resolveProvider().voiceDialogueTurn(history),
 };

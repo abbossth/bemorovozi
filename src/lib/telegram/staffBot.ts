@@ -4,7 +4,7 @@ import Staff from "@/models/Staff";
 import TelegramLinkToken from "@/models/TelegramLinkToken";
 import Feedback from "@/models/Feedback";
 import TelegramNotification from "@/models/TelegramNotification";
-import { SEVERITY_LABEL } from "./format";
+import { escapeHtml, SEVERITY_LABEL } from "./format";
 
 let bot: Bot | null = null;
 
@@ -20,6 +20,13 @@ export function buildNotificationText(params: {
   transcript: string;
   trackingCode: string;
   createdAt: Date;
+  /** staff-conduct complaint: skips the department and goes straight to management */
+  routedToManagement?: boolean;
+  /** "shikoyat" | "taklif" — only known for AI-conversation submissions */
+  kind?: string;
+  roomOrWard?: string;
+  staffName?: string;
+  occurredAt?: string;
 }) {
   const time = params.createdAt.toLocaleString("uz-UZ", {
     day: "numeric",
@@ -27,12 +34,20 @@ export function buildNotificationText(params: {
     hour: "2-digit",
     minute: "2-digit",
   });
+  const details = [
+    params.roomOrWard && `🚪 Xona/palata: ${escapeHtml(params.roomOrWard)}`,
+    params.staffName && `👤 Xodim: ${escapeHtml(params.staffName)}`,
+    params.occurredAt && `⏱ Qachon: ${escapeHtml(params.occurredAt)}`,
+  ].filter(Boolean);
+  const kindLabel = params.kind === "taklif" ? "taklif" : "xabar";
   return (
-    `${SEVERITY_LABEL[params.severity]} jiddiylikdagi yangi xabar\n\n` +
-    `📍 <b>${params.departmentName}</b>\n` +
+    (params.routedToManagement ? "🏛 <b>Rahbariyatga yo'naltirilgan</b>\n" : "") +
+    `${SEVERITY_LABEL[params.severity]} jiddiylikdagi yangi ${kindLabel}\n\n` +
+    `📍 <b>${escapeHtml(params.departmentName)}</b>\n` +
     `🕐 ${time}\n` +
-    `🔖 ${params.trackingCode}\n\n` +
-    `${params.transcript}`
+    `🔖 ${params.trackingCode}\n` +
+    (details.length ? `${details.join("\n")}\n` : "") +
+    `\n${escapeHtml(params.transcript)}`
   );
 }
 

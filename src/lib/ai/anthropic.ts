@@ -1,11 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildClassificationPrompt, buildVoiceTurnPrompt } from "./prompts";
+import { buildClassificationPrompt } from "./prompts";
 import type {
   AiProvider,
   ClassificationInput,
   ClassificationResult,
-  VoiceDialogueResult,
-  VoiceTurn,
 } from "./types";
 
 const MODEL = "claude-sonnet-5";
@@ -37,21 +35,5 @@ export const anthropicProvider: AiProvider = {
     });
     const text = message.content.find((c) => c.type === "text")?.text ?? "";
     return extractJson(text) as ClassificationResult;
-  },
-
-  async voiceDialogueTurn(history: VoiceTurn[]): Promise<VoiceDialogueResult> {
-    const anthropic = client();
-    const message = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 300,
-      messages: [
-        {
-          role: "user",
-          content: `${buildVoiceTurnPrompt(history)}\n\nJavobni FAQAT JSON sifatida qaytaring, boshqa hech qanday matnsiz.`,
-        },
-      ],
-    });
-    const text = message.content.find((c) => c.type === "text")?.text ?? "";
-    return extractJson(text) as VoiceDialogueResult;
   },
 };

@@ -1,4 +1,4 @@
-import type { ClassificationInput, VoiceTurn } from "./types";
+import type { ClassificationInput } from "./types";
 
 // Hard clinical-safety rules for severity classification. These exist because
 // leaving severity entirely to the model's free judgment let surface-level
@@ -38,19 +38,4 @@ Javobni faqat quyidagi JSON formatda qaytaring:
 - summary: xabarning bir yoki ikki jumlali xolis, qisqa o'zbekcha xulosasi
 - suggestedDepartment: mavjud bo'limlar ro'yxatidan eng mos keladigan bo'lim nomi
 - issueTag: muammoning snake_case formatidagi qisqa lotin-o'zbekcha kodi (masalan "dori_vaqtida_berilmadi"), o'xshash xabarlarni guruhlash uchun ishlatiladi`;
-}
-
-export function buildVoiceTurnPrompt(history: VoiceTurn[]) {
-  const turnCount = history.filter((t) => t.role === "patient").length;
-  return `Siz shifoxonadagi bemor bilan ovozli suhbatlashayotgan mehribon AI yordamchisiz. Bemor to'liq anonim — ismini so'ramang.
-Vazifangiz: bemorning muammosini 2-3 savolda aniqlashtirish, so'ng suhbatni yakunlash.
-
-Hozirgacha bemor ${turnCount} marta gapirdi. Agar bu 2 yoki undan ko'p bo'lsa, muammoni tasdiqlab, suhbatni yakunlang (done: true) va rahmat ayting.
-
-Suhbat tarixi:
-${history.map((t) => `${t.role === "ai" ? "Yordamchi" : "Bemor"}: ${t.text}`).join("\n")}
-
-Javobni faqat quyidagi JSON formatda qaytaring:
-- reply: yordamchining keyingi o'zbekcha javobi (qisqa, tabiiy, bir yoki ikki jumla)
-- done: suhbatni yakunlash vaqti kelganini bildiruvchi boolean`;
 }

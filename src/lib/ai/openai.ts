@@ -1,13 +1,11 @@
 import OpenAI from "openai";
 import { withRetry } from "@/lib/retry";
 import { time } from "@/lib/timing";
-import { buildClassificationPrompt, buildVoiceTurnPrompt } from "./prompts";
+import { buildClassificationPrompt } from "./prompts";
 import type {
   AiProvider,
   ClassificationInput,
   ClassificationResult,
-  VoiceDialogueResult,
-  VoiceTurn,
 } from "./types";
 
 // gpt-4.1-mini: fast (~1.3-1.7s measured for this task), cheap, direct output
@@ -55,37 +53,5 @@ export const openaiProvider: AiProvider = {
     const raw = response.choices[0]?.message?.content;
     if (!raw) throw new Error("OpenAI classification returned an empty response");
     return JSON.parse(raw) as ClassificationResult;
-  },
-
-  async voiceDialogueTurn(history: VoiceTurn[]): Promise<VoiceDialogueResult> {
-    const openai = client();
-    const response = await time("openai.voiceDialogueTurn", () =>
-      withRetry(() =>
-        openai.chat.completions.create({
-          model: MODEL,
-          messages: [{ role: "user", content: buildVoiceTurnPrompt(history) }],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "voice_turn",
-              strict: true,
-              schema: {
-                type: "object",
-                properties: {
-                  reply: { type: "string" },
-                  done: { type: "boolean" },
-                },
-                required: ["reply", "done"],
-                additionalProperties: false,
-              },
-            },
-          },
-        })
-      )
-    );
-
-    const raw = response.choices[0]?.message?.content;
-    if (!raw) throw new Error("OpenAI dialogue turn returned an empty response");
-    return JSON.parse(raw) as VoiceDialogueResult;
   },
 };

@@ -8,12 +8,25 @@ import { time, mark } from "@/lib/timing";
 
 export class DepartmentNotFoundError extends Error {}
 
+/** Extra structured data that only the AI conversation (web chat/voice) produces. */
+export type FeedbackExtras = {
+  kind?: "shikoyat" | "taklif";
+  roomOrWard?: string;
+  staffName?: string;
+  occurredAt?: string;
+  routedToManagement?: boolean;
+  conversation?: { role: "assistant" | "patient"; text: string }[];
+  /** Appended to the transcript for the severity classifier only; never stored as the patient's words. */
+  classifierContext?: string;
+};
+
 type CreateFeedbackInput = {
   hospitalId: string;
   departmentId: string;
   channel: "text" | "voice";
   transcript: string;
   source: "web" | "telegram";
+  extras?: FeedbackExtras;
 };
 
 /**
@@ -22,7 +35,7 @@ type CreateFeedbackInput = {
  * bots, so there is exactly one place that talks to the AI classifier and
  * writes to the Feedback collection.
  */
-export async function createFeedback({ hospitalId, departmentId, channel, transcript, source }: CreateFeedbackInput) {
+export async function createFeedback({ hospitalId, departmentId, channel, transcript, source, extras }: CreateFeedbackInput) {
   const totalStart = Date.now();
   await time("createFeedback.connectDB", () => connectDB());
 
@@ -39,7 +52,7 @@ export async function createFeedback({ hospitalId, departmentId, channel, transc
   try {
     classification = await time("createFeedback.aiClassify", () =>
       ai.classifyFeedback({
-        transcript,
+        transcript: extras?.classifierContext ? `${transcript}\n\n${extras.classifierContext}` : transcript,
         departmentName: department.name,
         availableDepartments: allDepartments.map((d) => d.name),
       })
@@ -78,6 +91,12 @@ export async function createFeedback({ hospitalId, departmentId, channel, transc
       issueTag: classification.issueTag,
       trackingCode,
       source,
+      kind: extras?.kind,
+      roomOrWard: extras?.roomOrWard,
+      staffName: extras?.staffName,
+      occurredAt: extras?.occurredAt,
+      routedToManagement: extras?.routedToManagement ?? false,
+      conversation: extras?.conversation,
     })
   );
 

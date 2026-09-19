@@ -22,9 +22,17 @@ export async function connectDB() {
   }
 
   if (!cache.promise) {
-    cache.promise = mongoose.connect(MONGODB_URI, { bufferCommands: false });
+    // Fail in ~10s instead of the 30s default, so a network blip doesn't hang the page.
+    cache.promise = mongoose.connect(MONGODB_URI, { bufferCommands: false, serverSelectionTimeoutMS: 10000 });
   }
 
-  cache.conn = await cache.promise;
+  try {
+    cache.conn = await cache.promise;
+  } catch (error) {
+    // Don't cache the rejection: otherwise one transient network failure poisons this
+    // server instance and every later request fails until it is restarted.
+    cache.promise = null;
+    throw error;
+  }
   return cache.conn;
 }

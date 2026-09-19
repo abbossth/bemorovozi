@@ -13,8 +13,13 @@ yo'naltiruvchi platforma. Umummilliy AI Xakaton (Xorazm, 2026) uchun.
 - **AI**: swappable provider (`src/lib/ai`) — hozircha **Gemini**
   (`gemini-3.6-flash`) ulangan; `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`
   qo'yilsa, kod o'zgarishsiz Claude'ga o'tadi
-- **Ovoz**: swappable STT/TTS (`src/lib/voice`) — **VoiceLab** asosiy, ishlamasa
-  **NeuronAI**'ga avtomatik o'tadi (`src/lib/voice/index.ts`)
+- **Suhbat motori**: bemor bilan suhbat **bitta** state machine'da (`src/lib/conversation`),
+  matn ham, ovoz ham shuni ishlatadi. Gemini (`gemini-3.6-flash`, structured output) faqat
+  maydonlarni ajratadi va javob matnini yozadi; bosqichlar, savollar chegarasi (max 3) va
+  tasdiqlash serverda kod bilan boshqariladi
+- **Ovoz**: STT/TTS qatlami (`src/lib/voice`) — **NeuronAI** asosiy (`VOICE_PROVIDER`),
+  ishlamasa yoki balansi tugasa **VoiceLab**'ga avtomatik o'tadi. Ovoz suhbat mantig'iga
+  qo'shilmaydi: STT matn beradi, motorning matn javobi TTS bilan o'qiladi
 - **QR + PDF**: `qrcode` + `@react-pdf/renderer`
 - **Telegram**: ikkita bot (grammY) — xodim bildirishnoma boti va anonim bemor
   boti, ikkalasi ham `src/lib/createFeedback.ts`dagi bitta pipeline'ni ishlatadi
@@ -30,6 +35,7 @@ npm run dev
 web config + Admin SDK, VoiceLab). Ixtiyoriy qolgan narsa:
 
 - `ANTHROPIC_API_KEY` — agar Claude'ga o'tmoqchi bo'lsangiz (`AI_PROVIDER=anthropic`)
+- `CONVERSATION_SECRET` — suhbat holati tokenini imzolaydi (`openssl rand -hex 32`)
 
 To'liq ro'yxat uchun `.env.example`ga qarang.
 
@@ -49,7 +55,9 @@ parol) yaratish kerak — o'zi ro'yxatdan o'tish yo'q (spetsifikatsiya talabi).
 ## Testlar
 
 ```bash
-npm run test    # Vitest — retry/backoff, tracking code, AI tag normalizatsiyasi
+npm run test    # Vitest — suhbat motori, holat tokeni, ovoz VAD/failover, retry, tracking code
+# Gemini prompt sifati (haqiqiy API, kvota sarflaydi):
+LIVE_GEMINI=1 node --env-file=.env.local node_modules/.bin/vitest run src/lib/conversation/live.eval.test.ts
 npm run lint    # ESLint
 npx tsc --noEmit
 npm run build   # production build
@@ -62,6 +70,10 @@ npm run build   # production build
 - `src/app/(marketing)` (`/`, `/narxlar`) — bosh sahifa va narxlar
 - `src/lib/ai` — provayderdan mustaqil AI qatlami (Gemini/Anthropic)
 - `src/lib/voice` — STT/TTS qatlami, VoiceLab → NeuronAI avtomatik fallback bilan
+- `src/lib/conversation` — suhbat motori: `engine.ts` (state machine), `model.ts` (Gemini),
+  `token.ts` (imzolangan holat), `finalize.ts` (tasdiqlangach yuborish)
+- `src/components/patient` — `ConversationView` (matn va ovoz uchun umumiy chat),
+  `TextComposer`, `VoiceControls` (mikrofon/orb, STT/TTS)
 - `src/lib/createFeedback.ts` — yagona feedback-yaratish pipeline (web forma +
   ikkala Telegram bot shu bittasini chaqiradi)
 - `src/lib/telegram` — ikkala botning grammY logikasi (`staffBot.ts`,

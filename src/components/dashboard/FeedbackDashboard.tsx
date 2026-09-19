@@ -19,6 +19,13 @@ type FeedbackItem = {
   channel: "text" | "voice";
   trackingCode: string;
   createdAt: string;
+  kind: "shikoyat" | "taklif";
+  room: string | null;
+  staffName: string | null;
+  occurredAt: string | null;
+  routedToManagement: boolean;
+  /** full assistant + patient exchange (web chat/voice submissions only) */
+  conversation: { role: "assistant" | "patient"; text: string }[] | null;
   isSystemic: boolean;
   clusterCount: number;
 };
@@ -170,6 +177,14 @@ export function FeedbackDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <SeverityBadge severity={item.severity} />
+                    {item.kind === "taklif" && (
+                      <span className="rounded-full bg-teal-tint px-2.5 py-1 text-xs font-bold text-teal">Taklif</span>
+                    )}
+                    {item.routedToManagement && (
+                      <span className="rounded-full bg-amber-tint px-2.5 py-1 text-xs font-bold text-amber">
+                        Rahbariyatga
+                      </span>
+                    )}
                     {item.isSystemic && (
                       <span className="rounded-full bg-amber-tint px-2.5 py-1 text-xs font-bold text-amber">
                         Tizimli muammo · {item.clusterCount}
@@ -200,6 +215,34 @@ export function FeedbackDashboard() {
                   <span className="font-semibold text-ink">{selected.dept}</span>
                 </div>
                 <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Turi</span>
+                  <span className="font-semibold text-ink">{selected.kind === "taklif" ? "Taklif" : "Shikoyat"}</span>
+                </div>
+                {selected.routedToManagement && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Yo&apos;nalish</span>
+                    <span className="font-semibold text-amber">Rahbariyatga</span>
+                  </div>
+                )}
+                {selected.room && (
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-500">Xona/palata</span>
+                    <span className="text-right font-semibold text-ink">{selected.room}</span>
+                  </div>
+                )}
+                {selected.staffName && (
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-500">Xodim</span>
+                    <span className="text-right font-semibold text-ink">{selected.staffName}</span>
+                  </div>
+                )}
+                {selected.occurredAt && (
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-500">Qachon (bemor aytgani)</span>
+                    <span className="text-right font-semibold text-ink">{selected.occurredAt}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Vaqt</span>
                   <span className="font-semibold text-ink">{formatTime(selected.createdAt)}</span>
                 </div>
@@ -212,6 +255,20 @@ export function FeedbackDashboard() {
                   <StatusBadge status={selected.status} />
                 </div>
               </div>
+
+              {selected.conversation && selected.conversation.length > 0 && (
+                <details className="rounded-xl border border-gray-200 bg-[#F7F9F8] p-3 text-sm">
+                  <summary className="cursor-pointer font-semibold text-ink">To&apos;liq suhbat</summary>
+                  <div className="mt-2.5 flex flex-col gap-2">
+                    {selected.conversation.map((m, i) => (
+                      <p key={i} className="leading-relaxed text-ink">
+                        <span className="font-semibold text-gray-500">{m.role === "assistant" ? "Yordamchi" : "Bemor"}: </span>
+                        {m.text}
+                      </p>
+                    ))}
+                  </div>
+                </details>
+              )}
 
               {selected.status === "hal_qilindi" ? (
                 <div className="mt-auto flex items-center gap-2 text-sm font-semibold text-teal">
